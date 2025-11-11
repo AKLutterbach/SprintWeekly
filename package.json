@@ -1,0 +1,22 @@
+{
+  "name": "jira-global-page-ui-kit",
+  "version": "1.1.25",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "lint": "eslint src/**/*"
+  },
+  "devDependencies": {
+    "@babel/preset-react": "^7.28.5",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react-hooks": "^4.6.0"
+  },
+  "dependencies": {
+    "@forge/api": "^6.1.5",
+    "@forge/bridge": "5.7.0",
+    "@forge/react": "11.6.0",
+    "@forge/resolver": "1.7.1",
+    "react": "^18.2.0"
+  }
+}
