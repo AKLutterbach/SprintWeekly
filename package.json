@@ -5,18 +5,41 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "lint": "eslint src/**/*"
+    "lint": "eslint src/**/*",
+    "prepare": "husky install",
+    "build": "tsc -p tsconfig.json",
+    "dev": "echo \"dev build will be handled by esbuild; configure as needed\"",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
     "@babel/preset-react": "^7.28.5",
+    "@commitlint/cli": "^17.0.0",
+    "@commitlint/config-conventional": "^17.0.0",
+    "@types/jest": "^29.5.3",
+    "@types/node": "^20.4.2",
+    "esbuild": "^0.18.16",
     "eslint": "^8.56.0",
-    "eslint-plugin-react-hooks": "^4.6.0"
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^8.0.0",
+    "jest": "^30.2.0",
+    "lint-staged": "^14.0.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  },
+  "lint-staged": {
+    "src/**/*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
   },
   "dependencies": {
     "@forge/api": "^6.1.5",
     "@forge/bridge": "5.7.0",
     "@forge/react": "11.6.0",
     "@forge/resolver": "1.7.1",
-    "react": "^18.2.0"
+    "pino": "^8.13.0",
+    "react": "^18.2.0",
+    "zod": "^4.1.12"
   }
 }

@@ -25,3 +25,11 @@ resources:
 permissions:
   scopes:
     - read:jira-work
+    - read:issue:jira
+    - read:project:jira
+    - read:filter:jira
+    - read:issue-details:jira
+    - read:board-scope:jira-software
+    - read:board-scope.admin:jira-software
+    # Optional: allow uploads when we implement attachment exports
+    # - write:attachment:jira
