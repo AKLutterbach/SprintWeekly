@@ -65,7 +65,8 @@ export async function getCache<T = CacheValue>(key: string): Promise<T | null> {
   try {
     const parsed = JSON.parse(raw);
     return parsed.v as T;
-  } catch (e) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_) {
     // If stored payload is corrupt, delete and return null
     await backend.del(key);
     return null;

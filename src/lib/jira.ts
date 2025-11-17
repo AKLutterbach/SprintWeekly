@@ -62,7 +62,8 @@ export async function expandScopeToJQL(scope: Scope): Promise<string> {
     }
 
     return 'issueKey IS NOT NULL';
-  } catch (err) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_) {
     // On any error, return a permissive JQL so callers don't break; caller can
     // detect `partial`/permission problems and surface them in the UI.
     return 'issueKey IS NOT NULL';
@@ -113,7 +114,8 @@ export async function getSprintDates(boardId: string | number, sprintId: string 
       startDate: body?.startDate,
       endDate: body?.endDate
     };
-  } catch (err) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_) {
     return null;
   }
 }

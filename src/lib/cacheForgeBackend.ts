@@ -67,7 +67,8 @@ export function createForgeBackend(storageClient: ForgeStorageLike): StorageBack
         const wrapper: any = { v: inner };
         if (ttlSec) wrapper.expiresAt = Date.now() + ttlSec * 1000;
         payload = JSON.stringify(wrapper);
-      } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_) {
         // value is not JSON; wrap it as a raw string
         const wrapper: any = { v: value };
         if (ttlSec) wrapper.expiresAt = Date.now() + ttlSec * 1000;

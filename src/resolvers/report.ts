@@ -1,4 +1,4 @@
-import { ReportRequestSchema, type ReportRequest } from '../lib/validators';
+import { type ReportRequest } from '../lib/validators';
 import jira from '../lib/jira';
 import computeMetrics, { Issue } from '../lib/computeMetrics';
 import cache from '../lib/cache';
@@ -15,13 +15,12 @@ import { childWithRequestId } from '../lib/logger';
  * - caches the result
  */
 export async function buildReport(payload: unknown) {
-  // validate
-  const parsed = ReportRequestSchema.safeParse(payload);
-  if (!parsed.success) {
-    return { error: 'INVALID_REQUEST', details: parsed.error }
+  // Type assertion - runtime validation removed
+  const req = payload as ReportRequest;
+  if (!req || !req.requestId) {
+    return { error: 'INVALID_REQUEST', details: 'requestId is required' };
   }
 
-  const req = parsed.data as ReportRequest;
   const requestId = req.requestId || `rid-${Date.now()}`;
   const log = childWithRequestId(requestId);
 

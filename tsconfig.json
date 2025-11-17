@@ -6,14 +6,16 @@
     "jsx": "react-jsx",
     "rootDir": "src",
     "outDir": "dist",
-    "allowJs": true,
+    "allowJs": false,
     "checkJs": false,
-    "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": false,
     "strict": false
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
   "exclude": ["node_modules", "dist"]
 }
