@@ -7,8 +7,8 @@
   "scripts": {
     "lint": "eslint src/**/*",
     "prepare": "husky install",
-  "build": "tsc -p tsconfig.build.json",
-  "predeploy": "npm run build",
+    "build": "tsc -p tsconfig.build.json",
+    "predeploy": "npm run build",
     "dev": "echo \"dev build will be handled by esbuild; configure as needed\"",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch"
@@ -41,8 +41,8 @@
     "@forge/bridge": "5.7.0",
     "@forge/react": "11.6.0",
     "@forge/resolver": "1.7.1",
+    "jspdf": "^3.0.4",
     "pino": "^8.13.0",
     "react": "^18.2.0"
   }
-
 }

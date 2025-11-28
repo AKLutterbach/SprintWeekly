@@ -83,12 +83,23 @@ export async function pageSearch(jql: string, fields: string[] = ['*all'], maxRe
   while (collected.length < maxResults) {
   const url = route`/rest/api/3/search?jql=${jql}&startAt=${startAt}&maxResults=${perPage}&fields=${fields.join(',')}`;
   const res = await asUser().requestJira(url, { method: 'GET' });
+    console.log(`pageSearch request: ${url}`);
+    console.log(`pageSearch response status: ${res?.status}`);
+    
     if (!res || res.status !== 200) {
+      // Log the error response for debugging
+      try {
+        const errorBody = await res?.json();
+        console.error(`pageSearch error response:`, JSON.stringify(errorBody));
+      } catch {
+        console.error(`pageSearch failed with status ${res?.status}, could not parse error`);
+      }
       // If we get a permission error or other non-200, stop and return what we have.
       break;
     }
 
     const body = await res.json();
+    console.log(`pageSearch returned ${body?.issues?.length || 0} issues, total: ${body?.total || 0}`);
     if (!body || !Array.isArray(body.issues)) break;
 
     collected.push(...body.issues);
@@ -97,6 +108,7 @@ export async function pageSearch(jql: string, fields: string[] = ['*all'], maxRe
     startAt += body.issues.length;
   }
 
+  console.log(`pageSearch collected ${collected.length} total issues`);
   return collected.slice(0, maxResults);
 }
 

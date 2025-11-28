@@ -16,7 +16,7 @@ modules:
         function: resolver
       render: native
       title: Sprint Weekly
-      icon: https://developer.atlassian.com/platform/forge/images/forge-icon.svg
+      icon: https://raw.githubusercontent.com/atlassian/forge-icons/main/icons/app-icons/jira-issue.svg
       layout: basic
 resources:
   - key: main
