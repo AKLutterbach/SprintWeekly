@@ -18,9 +18,18 @@ modules:
       title: Sprint Weekly
       icon: https://raw.githubusercontent.com/atlassian/forge-icons/main/icons/app-icons/jira-issue.svg
       layout: basic
+  jira:projectPage:
+    - key: sprint-weekly-custom-page
+      resource: sprint-report-ui
+      resolver:
+        function: resolver
+      title: Sprint Weekly (Custom)
+      layout: blank
 resources:
   - key: main
     path: src/frontend/index.jsx
+  - key: sprint-report-ui
+    path: static/sprint-report/build
 
 permissions:
   scopes:
