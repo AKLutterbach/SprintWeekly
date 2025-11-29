@@ -7,12 +7,12 @@ export const METRIC_CARD_STYLES = {
   layout: {
     largeCard: {
       height: 35, // mm
-      borderRadius: 3, // mm
-      borderWidth: 2.5, // px (absolute)
+      borderRadius: 1.3, // mm (~5px)
+      borderWidth: 1.25, // px (absolute) - REDUCED BY 50% from 2.5
     },
     smallCard: {
       height: 16, // mm
-      borderRadius: 3, // mm
+      borderRadius: 1.3, // mm (~5px)
       borderWidth: 0.3, // px (absolute)
     },
     columnGap: 5, // mm - gap between columns

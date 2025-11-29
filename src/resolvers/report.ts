@@ -150,10 +150,69 @@ export async function buildReport(payload: unknown) {
     carryoverBlockers: carryoverBlockers.length
   });
 
+  // Transform metrics into the overview structure expected by frontend
+  const byStatus = {
+    committed: {
+      total: completedIssues.length + uncompletedIssues.length,
+      breakdown: {
+        fromLastSprint: metrics.committedCarryover,
+        plannedAtStart: metrics.committedAtStart - metrics.addedMidSprint,
+        addedMidSprint: metrics.addedMidSprint
+      }
+    },
+    complete: {
+      total: completedIssues.length,
+      breakdown: {
+        fromLastSprint: completedIssues.filter(i => 
+          issues.find(issue => issue.key === i.key && 
+            (issue.fields as any).created && 
+            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
+          )
+        ).length,
+        plannedAtStart: completedIssues.filter(i => 
+          issues.find(issue => issue.key === i.key && 
+            (issue.fields as any).created && 
+            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
+          )
+        ).length,
+        addedMidSprint: completedIssues.filter(i => 
+          issues.find(issue => issue.key === i.key && 
+            (issue.fields as any).created && 
+            new Date((issue.fields as any).created) >= new Date((req.window as any)?.start || 0)
+          )
+        ).length
+      }
+    },
+    incomplete: {
+      total: uncompletedIssues.length,
+      breakdown: {
+        fromLastSprint: uncompletedIssues.filter(i => 
+          issues.find(issue => issue.key === i.key && 
+            (issue.fields as any).created && 
+            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
+          )
+        ).length,
+        plannedAtStart: uncompletedIssues.filter(i => 
+          issues.find(issue => issue.key === i.key && 
+            (issue.fields as any).created && 
+            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
+          )
+        ).length,
+        addedMidSprint: uncompletedIssues.filter(i => 
+          issues.find(issue => issue.key === i.key && 
+            (issue.fields as any).created && 
+            new Date((issue.fields as any).created) >= new Date((req.window as any)?.start || 0)
+          )
+        ).length
+      }
+    }
+  };
+
   const reportPayload = {
     requestId,
     generatedAt: new Date().toISOString(),
     metrics,
+    byStatus,
     totalIssues: issues.length,
     issues: {
       completed: completedIssues,

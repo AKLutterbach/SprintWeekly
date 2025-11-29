@@ -1,10 +1,13 @@
 /**
  * Export resolver - generates PDF and CSV exports of sprint reports
  * PDF uses jsPDF library which works in serverless environments
+ * Uses Inter font embedded in the PDF for consistent rendering
  */
 
 import { jsPDF } from 'jspdf';
 import { METRIC_CARD_STYLES } from '../config/metricCardStyles';
+import interRegular from '../assets/fonts/inter-regular.base64';
+import interSemiBold from '../assets/fonts/inter-semibold.base64';
 
 interface ExportRequest {
   format: 'pdf' | 'csv';
@@ -13,6 +16,7 @@ interface ExportRequest {
     generatedAt: string;
     scope: { type: string; id: string };
     metrics: any;
+    byStatus?: any;
     issues: {
       completed: any[];
       uncompleted: any[];
@@ -39,7 +43,7 @@ function formatDate(dateStr: string): string {
  * Creates a clean, client-ready PDF that mirrors the main report page layout
  */
 async function generatePDF(data: ExportRequest['reportData'], sprintName: string, reportTitle: string, startDate?: string, endDate?: string): Promise<Buffer> {
-  const { metrics, issues } = data;
+  const { metrics, byStatus, issues } = data;
   // Format date without seconds: MM/DD/YYYY, HH:MM AM/PM
   const now = new Date();
   const generatedAt = now.toLocaleString('en-US', { 
@@ -57,6 +61,15 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     unit: 'mm',
     format: 'a4'
   });
+
+  // Register Inter font and embed it in the PDF
+  if (interRegular && interSemiBold) {
+    doc.addFileToVFS('Inter-Regular.ttf', interRegular);
+    doc.addFont('Inter-Regular.ttf', 'Inter', 'normal');
+    
+    doc.addFileToVFS('Inter-SemiBold.ttf', interSemiBold);
+    doc.addFont('Inter-SemiBold.ttf', 'Inter', 'bold');
+  }
 
   let yPos = 25;
   const pageHeight = doc.internal.pageSize.height;
@@ -81,7 +94,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   
   // Left side - Report title
   doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('Inter', 'bold');
   doc.setTextColor(49, 49, 49);  // #313131
   // Split long titles if needed (max width: 65% of content width to leave room for right side)
   const maxTitleWidth = contentWidth * 0.65;
@@ -96,7 +109,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   const rightX = pageWidth - margin;
   let rightY = headerStartY - 16;
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
+  doc.setFont('Inter', 'italic');
   doc.setTextColor(150, 150, 150);  // Match footer text color
   
   // Line 1: "Reporting period:"
@@ -114,7 +127,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   
   // Left side - Sprint name (increased font size by 3pt: was 10, now 13)
   doc.setFontSize(13);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Inter', 'normal');
   doc.setTextColor(100, 100, 100);
   doc.text(sprintName, margin, yPos);
   doc.setTextColor(0, 0, 0);
@@ -123,7 +136,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   // ========== SPRINT METRICS SECTION ==========
   checkPageBreak(90);
   doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('Inter', 'bold');
   doc.setTextColor(49, 49, 49);  // #313131
   doc.text('Sprint Status Overview', margin, yPos);
   doc.setTextColor(0, 0, 0);
@@ -184,26 +197,35 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   const cardsY = yPos;
 
   // === PROCESS EACH COLUMN ===
+  // Use byStatus if available (new structure), otherwise fall back to metrics (old structure)
+  const committedTotal = byStatus?.committed?.total ?? (metrics.committedAtStart || 0);
+  const completeTotal = byStatus?.complete?.total ?? (metrics.completed || 0);
+  const incompleteTotal = byStatus?.incomplete?.total ?? (metrics.incompleteCarryover || 0);
+  
   const columns = [
     {
       x: margin,
       title: 'Committed',
-      value: metrics.committedAtStart || 0,
+      value: committedTotal,
       subtitle: 'Issues the team committed to this sprint',
       color: lightCommitted,
       breakdown: [
-        { label: 'From last\nsprint', value: metrics.committedCarryover || 0 },
-        { label: 'Planned at\nstart', value: Math.max(0, (metrics.committedAtStart || 0) - (metrics.committedCarryover || 0) - (metrics.addedMidSprint || 0)) },
-        { label: 'Added mid-\nsprint', value: metrics.addedMidSprint || 0 }
+        { label: 'From last\nsprint', value: byStatus?.committed?.breakdown?.fromLastSprint ?? (metrics.committedCarryover || 0) },
+        { label: 'Planned at\nstart', value: byStatus?.committed?.breakdown?.plannedAtStart ?? Math.max(0, (metrics.committedAtStart || 0) - (metrics.committedCarryover || 0) - (metrics.addedMidSprint || 0)) },
+        { label: 'Added mid-\nsprint', value: byStatus?.committed?.breakdown?.addedMidSprint ?? (metrics.addedMidSprint || 0) }
       ]
     },
     {
       x: margin + columnWidth + columnGap,
       title: 'Complete',
-      value: metrics.completed || 0,
+      value: completeTotal,
       subtitle: 'Issues finished by the end of this sprint',
       color: lightComplete,
-      breakdown: (() => {
+      breakdown: byStatus?.complete?.breakdown ? [
+        { label: 'From last\nsprint', value: byStatus.complete.breakdown.fromLastSprint || 0 },
+        { label: 'Planned at\nstart', value: byStatus.complete.breakdown.plannedAtStart || 0 },
+        { label: 'Added mid-\nsprint', value: byStatus.complete.breakdown.addedMidSprint || 0 }
+      ] : (() => {
         const completedTotal = metrics.completed || 0;
         const committedTotal = metrics.committedAtStart || 0;
         return [
@@ -216,10 +238,14 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     {
       x: margin + (columnWidth * 2) + (columnGap * 2),
       title: 'Incomplete',
-      value: metrics.incompleteCarryover || 0,
+      value: incompleteTotal,
       subtitle: 'Issues not finished by the end of this sprint',
       color: lightIncomplete,
-      breakdown: (() => {
+      breakdown: byStatus?.incomplete?.breakdown ? [
+        { label: 'From last\nsprint', value: byStatus.incomplete.breakdown.fromLastSprint || 0 },
+        { label: 'Planned at\nstart', value: byStatus.incomplete.breakdown.plannedAtStart || 0 },
+        { label: 'Added mid-\nsprint', value: byStatus.incomplete.breakdown.addedMidSprint || 0 }
+      ] : (() => {
         const incompleteTotal = metrics.incompleteCarryover || 0;
         const committedTotal = metrics.committedAtStart || 0;
         return [
@@ -235,13 +261,13 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     // Large card with color
     drawCard(col.x, cardsY, columnWidth, largeCardHeight, col.color, false);
     doc.setFontSize(typography.largeCard.title.fontSize);
-    doc.setFont('helvetica', typography.largeCard.title.fontWeight);
+    doc.setFont('Inter', typography.largeCard.title.fontWeight);
     const [tr, tg, tb] = typography.largeCard.title.color;
     doc.setTextColor(tr, tg, tb);
     doc.text(col.title, col.x + (columnWidth / 2), cardsY + 8, { align: 'center' });
     
     doc.setFontSize(typography.largeCard.value.fontSize);
-    doc.setFont('helvetica', typography.largeCard.value.fontWeight);
+    doc.setFont('Inter', typography.largeCard.value.fontWeight);
     const [vr, vg, vb] = typography.largeCard.value.color;
     doc.setTextColor(vr, vg, vb);
     doc.text(String(col.value), col.x + (columnWidth / 2), cardsY + 18, { align: 'center' });
@@ -262,7 +288,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       drawCard(smallCardX, smallCardsY, smallCardWidth, smallCardHeight, undefined, true);
       
       doc.setFontSize(typography.smallCard.value.fontSize);
-      doc.setFont('helvetica', typography.smallCard.value.fontWeight);
+      doc.setFont('Inter', typography.smallCard.value.fontWeight);
       const [svr, svg, svb] = typography.smallCard.value.color;
       doc.setTextColor(svr, svg, svb);
       doc.text(String(item.value), smallCardX + (smallCardWidth / 2), smallCardsY + 7, { align: 'center' });
@@ -280,8 +306,8 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
 
   // ========== SPRINT STATUS DETAIL SECTION ==========
   checkPageBreak(90);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setFont('Inter', 'bold');
   doc.setTextColor(49, 49, 49);  // #313131ff
   doc.text('Sprint Status Detail', margin, yPos);
   doc.setTextColor(0, 0, 0);
@@ -312,14 +338,18 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     // Draw top portion with rounded corners
     doc.roundedRect(x, y, w, r * 2, r, r, 'F');
   };
+  
+  // Convert 5px to mm for consistent border radius (1px ≈ 0.264mm, so 5px ≈ 1.32mm)
+  const containerBorderRadius = 1.32;
 
   // Helper function to draw table header
   const drawTableHeader = (keyColX: number, summaryColX: number, statusColX: number) => {
     const headerCellTop = yPos;
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Inter', 'bold');
     doc.setFillColor(245, 245, 245);
-    doc.rect(margin, headerCellTop, contentWidth, HEADER_ROW_HEIGHT, 'F');
+    // Extend header background to container edges
+    doc.rect(margin - 3, headerCellTop, contentWidth + 6, HEADER_ROW_HEIGHT, 'F');
     
     // Vertically align text to bottom of header cell
     const headerTextY = headerCellTop + HEADER_ROW_HEIGHT - HEADER_PADDING_TOP;
@@ -329,10 +359,10 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     doc.text('Status', statusColX + 2, headerTextY);
     yPos = headerCellTop + HEADER_ROW_HEIGHT;
     
-    // Draw separator line at bottom of header
+    // Draw separator line at bottom of header - extend to container edges
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.4);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
+    doc.line(margin - 3, yPos, pageWidth - margin + 3, yPos);
     yPos += 2;
   };
 
@@ -353,7 +383,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     // Draw colored background bar starting at container top
     const colorBarHeight = SECTION_PADDING + PILL_TO_TABLE_SPACING;
     doc.setFillColor(...getLightColor(badgeColor));
-    drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, 5);
+    drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, containerBorderRadius);
     
     // Calculate centered Y position for title text baseline
     const titleTextY = pillY + (PILL_TO_TABLE_SPACING / 2);
@@ -371,7 +401,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
     
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Inter', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.text(String(issueList.length), margin + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 1, { align: 'center' });
     doc.setTextColor(0, 0, 0);
@@ -381,49 +411,47 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     
     // Section title - centered vertically in the spacing area, aligned with badge
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Inter', 'bold');
     doc.text(title, margin + badgeWidth + 3, titleTextY);
     
     if (issueList.length === 0) {
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'italic');
+      doc.setFont('Inter', 'italic');
       doc.setTextColor(120, 120, 120);
       doc.text('No issues in this category', margin + 3, yPos + 4);
       doc.setTextColor(0, 0, 0);
       yPos += 14;
       yPos += SECTION_PADDING;
       
-      // Draw background container now that we know the actual height
+      // Don't draw filled background - just border
       const sectionEndY = yPos;
       const actualHeight = sectionEndY - sectionStartY;
-      doc.setFillColor(245, 245, 245);
-      doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, 5, 5, 'F');
       
-      // Draw subtle border around container
-      doc.setDrawColor(230, 230, 230);
+      // Draw subtle border around container - matches header background color
+      doc.setDrawColor(...getLightColor(badgeColor));
       doc.setLineWidth(0.2);
-      doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, 5, 5, 'S');
+      doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, containerBorderRadius, containerBorderRadius, 'S');
       doc.setDrawColor(0, 0, 0);
       
       // Redraw colored background bar
       doc.setFillColor(...getLightColor(badgeColor));
-      drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, 5);
+      drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, containerBorderRadius);
       
       // Redraw badge and text on top of background
       doc.setGState(new (doc as any).GState({ opacity: 0.5 }));
       doc.setFillColor(...badgeColor);
       doc.roundedRect(margin, badgeY, badgeWidth, badgeHeight, 1, 1, 'F');
       doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setFont('Inter', 'bold');
       doc.setTextColor(255, 255, 255);
       doc.text(String(issueList.length), margin + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 1, { align: 'center' });
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('Inter', 'bold');
       doc.text(title, margin + badgeWidth + 3, titleTextY);
       doc.setFontSize(10);
-      doc.setFont('helvetica', 'italic');
+      doc.setFont('Inter', 'italic');
       doc.setTextColor(120, 120, 120);
       doc.text('No issues in this category', margin + 3, yPos - SECTION_PADDING - 6);
       doc.setTextColor(0, 0, 0);
@@ -441,7 +469,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     drawTableHeader(keyColX, summaryColX, statusColX);
     
     // Table rows with smart pagination
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('Inter', 'normal');
     doc.setFontSize(9);
     
     issueList.forEach((issue: any, index: number) => {
@@ -466,21 +494,25 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       // Calculate vertical centering for text within the row
       const cellTop = yPos;
       
+      // Draw white background for the row
+      doc.setFillColor(255, 255, 255);
+      doc.rect(margin, cellTop, contentWidth, rowHeight, 'F');
+      
       // Center the text block vertically: start at top padding, then add half the available space
       // Font size is 10, so single line ~3.5mm, we want it centered in the textHeight space
       const textStartY = cellTop + ROW_PADDING_TOP + 3.5;
       
       // Draw the row text - all columns aligned at same Y position
       // Key column
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('Inter', 'bold');
       doc.text(key, keyColX + 2, textStartY);
       
       // Summary column (wrapped)
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('Inter', 'normal');
       doc.text(summaryLines, summaryColX + 2, textStartY);
       
       // Status column
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('Inter', 'normal');
       doc.text(status, statusColX + 2, textStartY);
       
       // Move past the entire row
@@ -497,22 +529,21 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     
     yPos += SECTION_PADDING;
     
-    // Draw background container now that we know the actual height
+    // Don't draw filled background container - rows have their own white backgrounds
+    // Just draw the border around container
     const sectionEndY = yPos;
     const actualHeight = sectionEndY - sectionStartY;
-    doc.setFillColor(245, 245, 245);
-    doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, 5, 5, 'F');
     
-    // Draw subtle border around container
-    doc.setDrawColor(230, 230, 230);
+    // Draw subtle border around container - matches header background color
+    doc.setDrawColor(...getLightColor(badgeColor));
     doc.setLineWidth(0.2);
-    doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, 5, 5, 'S');
+    doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, containerBorderRadius, containerBorderRadius, 'S');
     doc.setDrawColor(0, 0, 0);
     
-    // Redraw all content on top of background
+    // Redraw header area content on top
     // Colored background bar with solid light color (equivalent to 80% transparency)
     doc.setFillColor(...getLightColor(badgeColor));
-    drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, 5);
+    drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, containerBorderRadius);
     
     // Badge with 50% transparency
     doc.setGState(new (doc as any).GState({ opacity: 0.5 }));
@@ -520,82 +551,35 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     doc.roundedRect(margin, badgeY, badgeWidth, badgeHeight, 1, 1, 'F');
     doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Inter', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.text(String(issueList.length), margin + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 1, { align: 'center' });
     doc.setTextColor(0, 0, 0);
     
     // Title
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Inter', 'bold');
     doc.text(title, margin + badgeWidth + 3, titleTextY);
-    
-    // Redraw table header
-    const headerYPos = sectionStartY + SECTION_PADDING + PILL_TO_TABLE_SPACING;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(169, 169, 169);
-    const headerBottomY = headerYPos + HEADER_ROW_HEIGHT - 1;
-    doc.text('Key', keyColX + 2, headerBottomY);
-    doc.text('Summary', summaryColX + 2, headerBottomY);
-    doc.text('Status', statusColX + 2, headerBottomY);
-    doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.line(margin, headerYPos + HEADER_ROW_HEIGHT, pageWidth - margin, headerYPos + HEADER_ROW_HEIGHT);
-    doc.setDrawColor(0, 0, 0);
-    
-    // Redraw all rows
-    let rowYPos = headerYPos + HEADER_ROW_HEIGHT;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    
-    issueList.forEach((issue: any, index: number) => {
-      const key = issue.key || '-';
-      const summary = issue.summary || issue.fields?.summary || 'No summary';
-      const status = issue.status || issue.fields?.status?.name || 'Unknown';
-      
-      const summaryLines = doc.splitTextToSize(summary, summaryWidth);
-      const textHeight = Math.max(MIN_ROW_HEIGHT, summaryLines.length * 4);
-      const rowHeight = ROW_PADDING_TOP + textHeight + ROW_PADDING_BOTTOM;
-      
-      const textStartY = rowYPos + ROW_PADDING_TOP + 3.5;
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text(key, keyColX + 2, textStartY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(summaryLines, summaryColX + 2, textStartY);
-      doc.text(status, statusColX + 2, textStartY);
-      
-      rowYPos += rowHeight;
-      
-      if (index < issueList.length - 1) {
-        doc.setDrawColor(240, 240, 240);
-        doc.setLineWidth(ROW_SEPARATOR_HEIGHT);
-        doc.line(margin, rowYPos, pageWidth - margin, rowYPos);
-        rowYPos += ROW_SEPARATOR_HEIGHT;
-      }
-    });
   };
 
   // Add spacing before first table
   yPos += 3;
 
   // ========== COMMITTED ISSUES SECTION ==========
-  drawIssueTable('Committed', issues.completed.concat(issues.uncompleted, issues.carryoverBlockers || []), [33, 150, 243]); // Blue - all issues committed to sprint
+  drawIssueTable('Committed', issues.completed.concat(issues.uncompleted, issues.carryoverBlockers || []), [23, 159, 219]); // Blue - all issues committed to sprint
   yPos += TABLE_SECTION_SPACING;
 
   // ========== COMPLETE ISSUES SECTION ==========
-  drawIssueTable('Complete', issues.completed, [76, 175, 80]); // Green - completed issues
+  drawIssueTable('Complete', issues.completed, [87, 199, 115]); // Green - completed issues
   yPos += TABLE_SECTION_SPACING;
 
   // ========== INCOMPLETE ISSUES SECTION ==========
-  drawIssueTable('Incomplete', issues.uncompleted.concat(issues.carryoverBlockers || []), [255, 152, 0]); // Orange - uncompleted + blocked issues
+  drawIssueTable('Incomplete', issues.uncompleted.concat(issues.carryoverBlockers || []), [230, 135, 0]); // Darker orange - uncompleted + blocked issues
 
   // ========== FOOTER ON ALL PAGES ==========
   const pageCount = doc.getNumberOfPages();
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
+  doc.setFont('Inter', 'italic');
   doc.setTextColor(150, 150, 150);
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);

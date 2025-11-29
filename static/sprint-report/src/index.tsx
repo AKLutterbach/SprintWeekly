@@ -30,6 +30,9 @@ const App: React.FC = () => {
   const [manualStartDate, setManualStartDate] = useState('');
   const [manualEndDate, setManualEndDate] = useState('');
 
+  // Panel collapse state
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+
   // Load projects on mount
   useEffect(() => {
     const fetchProjects = async () => {
@@ -79,57 +82,82 @@ const App: React.FC = () => {
         }
       } catch (e: any) {
         console.error('Error loading sprints:', e);
+        setError(e.message);
       } finally {
         setLoadingSprints(false);
       }
     };
-    
+
     fetchSprints();
   }, [selectedProject]);
 
   const generateReport = async () => {
-    setLoading(true);
-    setError(null);
-    setReportData(null);
-    
+    if (!selectedProject) {
+      setError('Please select a project');
+      return;
+    }
+
+    if (useSprintMode && !selectedSprint) {
+      setError('Please select a sprint');
+      return;
+    }
+
+    if (!useSprintMode && (!manualStartDate || !manualEndDate)) {
+      setError('Please select start and end dates');
+      return;
+    }
+
     try {
-      let startDate, endDate;
+      setLoading(true);
+      setError(null);
       
-      if (useSprintMode) {
-        const sprint = sprints.find(s => s.id === selectedSprint);
-        if (!sprint) {
-          throw new Error('Sprint not found');
-        }
-        startDate = sprint.startDate?.split('T')[0];
-        endDate = sprint.endDate?.split('T')[0];
-      } else {
-        if (!manualStartDate || !manualEndDate) {
-          throw new Error('Please provide both start and end dates');
-        }
-        startDate = manualStartDate;
-        endDate = manualEndDate;
-      }
-      
-      const response: any = await invoke('getSprintStatusMetrics', {
-        projectKey: selectedProject,
-        sprintId: selectedSprint,
-        startDate,
-        endDate,
-        useSprintMode
-      });
-      
-      // Transform the response to match our expected shape
-      setReportData({
-        overview: {
-          committed: response.byStatus?.committed || { total: 0, breakdown: { fromLastSprint: 0, plannedAtStart: 0, addedMidSprint: 0 } },
-          completed: response.byStatus?.complete || { total: 0, breakdown: { fromLastSprint: 0, plannedAtStart: 0, addedMidSprint: 0 } },
-          incomplete: response.byStatus?.incomplete || { total: 0, breakdown: { fromLastSprint: 0, plannedAtStart: 0, addedMidSprint: 0 } }
+      // Build the payload structure expected by report.build
+      const payload = {
+        requestId: `custom-ui-${Date.now()}`,
+        scope: {
+          id: selectedProject,
+          ref: selectedProject
         },
-        projectKey: selectedProject,
-        sprintName: response.sprintName,
-        startDate,
-        endDate
-      });
+        useSprintMode,
+        ...(useSprintMode 
+          ? { sprintId: selectedSprint }
+          : { 
+              window: {
+                start: manualStartDate,
+                end: manualEndDate
+              }
+            }
+        )
+      };
+
+      console.log('Calling report.build with payload:', payload);
+      const result: any = await invoke('report.build', payload);
+      console.log('report.build returned:', result);
+      
+      // Handle cached vs fresh data
+      const reportPayload = result.cached ? result.payload : result.payload;
+      
+      if (reportPayload && (reportPayload.metrics || reportPayload.byStatus)) {
+        // Transform the data structure to match what SprintReportPage expects
+        const transformedData = {
+          overview: {
+            committed: reportPayload.byStatus?.committed || { total: 0, breakdown: {} },
+            completed: reportPayload.byStatus?.complete || { total: 0, breakdown: {} },
+            incomplete: reportPayload.byStatus?.incomplete || { total: 0, breakdown: {} }
+          },
+          issues: reportPayload.issues || { completed: [], uncompleted: [] },
+          sprintName: reportPayload.sprintName || 'Sprint',
+          projectName: reportPayload.projectName || selectedProject,
+          projectKey: selectedProject
+        };
+        
+        console.log('Transformed data:', transformedData);
+        setReportData(transformedData);
+        setIsPanelCollapsed(true); // Collapse panel after successful generation
+      } else {
+        console.error('Invalid data structure:', reportPayload);
+        setError('No data returned from report generation');
+      }
     } catch (e: any) {
       console.error('Error generating report:', e);
       setError(e.message || 'Failed to generate report');
@@ -142,137 +170,206 @@ const App: React.FC = () => {
 
   return (
     <div style={{
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      padding: '20px',
-      maxWidth: '1200px',
-      margin: '0 auto'
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '2px solid #0052cc' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 600, color: '#172b4d', margin: '0 0 8px 0' }}>
-          Sprint Weekly - Status Overview
-        </h1>
-      </div>
+      {/* Hero Section - only show when panel is not collapsed */}
+      {!isPanelCollapsed && (
+        <section className="sw-hero-section">
+          <div className="sw-hero-inner">
+            {/* Header Card */}
+            <div className="sw-card sw-header-card">
+              <div className="sw-header-eyebrow">Sprint report</div>
+              <h1 className="sw-header-title">Sprint Weekly</h1>
+              <p className="sw-header-subtitle">
+                Lightweight weekly status report for your active sprint.
+              </p>
+              <div className="sw-header-divider"></div>
+            </div>
 
-      {error && (
-        <div style={{
-          backgroundColor: '#ffebe6',
-          border: '1px solid #ff5630',
-          borderRadius: '4px',
-          padding: '16px',
-          color: '#bf2600',
-          marginBottom: '16px'
-        }}>
-          <strong>Error:</strong> {error}
+            {/* Customization Card */}
+            <div className="sw-card sw-customization-card">
+              <div 
+                style={{ 
+                  marginBottom: '16px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 600, color: '#172b4d' }}>
+                    Report customization
+                  </h3>
+                  <p style={{ margin: '0', fontSize: '13px', color: '#6b778c' }}>
+                    Select a project and sprint to generate your report.
+                  </p>
+                </div>
+              </div>
+            
+              {/* Two-column row for Project and Sprint */}
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                <div style={{ flex: '1 1 0' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: '#6b778c', marginBottom: '4px', display: 'block' }}>
+                    Project
+                  </label>
+                  <select 
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px' }}
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    disabled={loadingProjects}
+                  >
+                    <option value="">Select Project...</option>
+                    {projects.map(p => (
+                      <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ flex: '1 1 0' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: '#6b778c', marginBottom: '4px', display: 'block' }}>
+                    Sprint
+                  </label>
+                  <select 
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px' }}
+                    value={selectedSprint?.toString() || ''}
+                    onChange={(e) => setSelectedSprint(parseInt(e.target.value))}
+                    disabled={loadingSprints || !selectedProject}
+                  >
+                    <option value="">Select Sprint...</option>
+                    {sprints.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.state})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Use Sprint Mode checkbox with helper text */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <input 
+                    type="checkbox"
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    checked={useSprintMode}
+                    onChange={(e) => setUseSprintMode(e.target.checked)}
+                  />
+                  <label style={{ fontSize: '14px', fontWeight: 400, color: '#172b4d', margin: 0 }}>
+                    Use sprint mode
+                  </label>
+                </div>
+                <p style={{ margin: '0 0 0 26px', fontSize: '12px', color: '#6b778c' }}>
+                  When unchecked, you can specify custom date ranges instead of sprint boundaries.
+                </p>
+              </div>
+
+              {/* Manual date range when Sprint Mode is off */}
+              {!useSprintMode && (
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                  <div style={{ flex: '1 1 0' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#6b778c', marginBottom: '4px', display: 'block' }}>
+                      Start Date
+                    </label>
+                    <input 
+                      type="date"
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px' }}
+                      value={manualStartDate}
+                      onChange={(e) => setManualStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div style={{ flex: '1 1 0' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 500, color: '#6b778c', marginBottom: '4px', display: 'block' }}>
+                      End Date
+                    </label>
+                    <input 
+                      type="date"
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px' }}
+                      value={manualEndDate}
+                      onChange={(e) => setManualEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Generate Report button at bottom-right */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+                <div style={{ flex: '1 1 auto' }} />
+                <div style={{ flex: '0 0 auto' }}>
+                  <button 
+                    style={{
+                      padding: '10px 24px',
+                      backgroundColor: canGenerate ? '#0052cc' : '#dfe1e6',
+                      color: canGenerate ? 'white' : '#a5adba',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: canGenerate ? 'pointer' : 'not-allowed',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}
+                    onClick={generateReport}
+                    disabled={!canGenerate || loading}
+                  >
+                    {loading ? 'Loading...' : 'Generate report'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Collapsed Panel State */}
+      {isPanelCollapsed && (
+        <div style={{ backgroundColor: 'white', padding: '16px 24px', borderBottom: '1px solid #dfe1e6', marginBottom: '24px' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 600, color: '#172b4d' }}>
+                Report customization
+              </h3>
+            </div>
+            <button
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                fontSize: '20px',
+                color: '#42526e',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              onClick={() => setIsPanelCollapsed(false)}
+              aria-label="Expand customization panel"
+            >
+              ▼
+            </button>
+          </div>
         </div>
       )}
 
-      <div style={{ backgroundColor: '#f4f5f7', padding: '20px', borderRadius: '8px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#172b4d', marginBottom: '4px', display: 'block' }}>
-              Project
-            </label>
-            <select 
-              style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px', minWidth: '200px' }}
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              disabled={loadingProjects}
-            >
-              <option value="">Select Project...</option>
-              {projects.map(p => (
-                <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input 
-              type="checkbox"
-              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              checked={useSprintMode}
-              onChange={(e) => setUseSprintMode(e.target.checked)}
-            />
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#172b4d' }}>
-              Use Sprint Mode
-            </label>
-          </div>
-        </div>
-
-        {useSprintMode ? (
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: 600, color: '#172b4d', marginBottom: '4px', display: 'block' }}>
-                Sprint
-              </label>
-              <select 
-                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px', minWidth: '200px' }}
-                value={selectedSprint?.toString() || ''}
-                onChange={(e) => setSelectedSprint(parseInt(e.target.value))}
-                disabled={loadingSprints || !selectedProject}
-              >
-                <option value="">Select Sprint...</option>
-                {sprints.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.state})</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: 600, color: '#172b4d', marginBottom: '4px', display: 'block' }}>
-                Start Date
-              </label>
-              <input 
-                type="date"
-                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px' }}
-                value={manualStartDate}
-                onChange={(e) => setManualStartDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: 600, color: '#172b4d', marginBottom: '4px', display: 'block' }}>
-                End Date
-              </label>
-              <input 
-                type="date"
-                style={{ padding: '8px 12px', borderRadius: '4px', border: '1px solid #dfe1e6', fontSize: '14px' }}
-                value={manualEndDate}
-                onChange={(e) => setManualEndDate(e.target.value)}
-              />
-            </div>
+      {/* Report Content Area */}
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 24px' }}>
+        {error && (
+          <div style={{
+            backgroundColor: '#ffebe6',
+            border: '1px solid #ff5630',
+            borderRadius: '4px',
+            padding: '16px',
+            color: '#bf2600',
+            marginBottom: '16px'
+          }}>
+            <strong>Error:</strong> {error}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button 
-            style={{
-              padding: '10px 24px',
-              backgroundColor: canGenerate ? '#0052cc' : '#dfe1e6',
-              color: canGenerate ? 'white' : '#a5adba',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: canGenerate ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-              fontWeight: 600
-            }}
-            onClick={generateReport}
-            disabled={!canGenerate || loading}
-          >
-            {loading ? 'Loading...' : 'Generate Report'}
-          </button>
-        </div>
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+            <div>Loading sprint data...</div>
+          </div>
+        )}
+
+        {reportData && !loading && (
+          <SprintReportPage data={reportData} onRefresh={generateReport} />
+        )}
       </div>
-
-      {loading && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-          <div>Loading sprint data...</div>
-        </div>
-      )}
-
-      {reportData && !loading && (
-        <SprintReportPage data={reportData} />
-      )}
     </div>
   );
 };

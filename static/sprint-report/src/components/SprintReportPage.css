@@ -13,6 +13,17 @@
   border-bottom: 2px solid #e0e0e0;
 }
 
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.header-text {
+  flex: 1;
+}
+
 .report-title {
   font-size: 24px;
   font-weight: 600;
@@ -24,6 +35,40 @@
   font-size: 14px;
   color: #6b778c;
   margin: 0;
+}
+
+.export-pdf-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: #0052cc;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.export-pdf-button:hover {
+  background-color: #0065ff;
+}
+
+.export-pdf-button:active {
+  background-color: #0747a6;
+}
+
+.export-pdf-button:disabled {
+  background-color: #6b778c;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.export-pdf-button svg {
+  flex-shrink: 0;
 }
 
 /* Metrics Container - Three Columns */
@@ -44,7 +89,7 @@
 /* Large Metric Cards - Matching PDF colors */
 .metric-card {
   background-color: rgb(245, 245, 245);
-  border-radius: 16px;
+  border-radius: 5px;
   text-align: center;
   height: 132px;
   width: 100%;
@@ -53,26 +98,26 @@
   justify-content: center;
   align-items: center;
   padding: 24px;
-  border-width: 3px;
+  border-width: 5px;
   border-style: solid;
 }
 
-/* Committed - Light Blue */
+/* Committed - Blue (#0052cc from Generate Report button) */
 .metric-card-committed {
-  border-color: rgba(227, 242, 253, 1);
-  background: linear-gradient(135deg, rgba(227, 242, 253, 0.3) 0%, rgba(245, 245, 245, 1) 100%);
+  border-color: rgba(0, 82, 204, 0.3);
+  background-color: rgba(0, 82, 204, 0.08);
 }
 
 /* Complete - Light Green */
 .metric-card-complete {
-  border-color: rgba(232, 245, 233, 1);
-  background: linear-gradient(135deg, rgba(232, 245, 233, 0.3) 0%, rgba(245, 245, 245, 1) 100%);
+  border-color: rgba(209, 242, 211, 1);
+  background-color: rgba(209, 242, 211, 0.3);
 }
 
 /* Incomplete - Light Orange */
 .metric-card-incomplete {
-  border-color: rgba(255, 243, 224, 1);
-  background: linear-gradient(135deg, rgba(255, 243, 224, 0.3) 0%, rgba(245, 245, 245, 1) 100%);
+  border-color: rgba(255, 238, 201, 1);
+  background-color: rgba(255, 238, 201, 0.3);
 }
 
 .card-content {
@@ -117,7 +162,7 @@
 .small-cards {
   width: 100%;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
 }
 
@@ -125,26 +170,28 @@
   background-color: white;
   border: 1px solid rgb(220, 220, 220);
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-height: 70px;
 }
 
 .small-card-value {
   font-size: 18px;
   font-weight: 600;
   color: rgb(0, 0, 0);
-  min-width: 28px;
   text-align: center;
+  margin-top: 4px;
 }
 
 .small-card-label {
-  font-size: 10pt;
+  font-size: 8pt;
   color: rgb(100, 100, 100);
-  flex: 1;
-  text-align: left;
+  text-align: center;
 }
 
 /* Responsive Design */
@@ -156,4 +203,186 @@
   .metric-column {
     width: 100%;
   }
+}
+
+/* Sprint Status Detail Section */
+.status-detail-section {
+  margin-top: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.status-detail-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #172b4d;
+  margin: 0 0 8px 0;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+/* Detail Cards for each issue category */
+.detail-card {
+  background-color: white;
+  border-radius: 5px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 2px solid;
+}
+
+.detail-card-committed {
+  border-color: rgba(227, 242, 253, 1);
+}
+
+.detail-card-complete {
+  border-color: rgba(232, 245, 233, 1);
+}
+
+.detail-card-incomplete {
+  border-color: rgba(255, 243, 224, 1);
+}
+
+/* Detail Header with Badge and Title */
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background-color: rgb(250, 250, 250);
+}
+
+.detail-card-committed .detail-header {
+  background-color: rgb(227, 242, 253);
+}
+
+.detail-card-complete .detail-header {
+  background-color: rgb(232, 245, 233);
+}
+
+.detail-card-incomplete .detail-header {
+  background-color: rgb(255, 243, 224);
+}
+
+.detail-card-committed .detail-header {
+  background-color: rgb(227, 242, 253);
+}
+
+.detail-card-complete .detail-header {
+  background-color: rgb(232, 245, 233);
+}
+
+.detail-card-incomplete .detail-header {
+  background-color: rgb(255, 243, 224);
+}
+
+.detail-badge {
+  background-color: rgb(180, 180, 180);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  min-width: 32px;
+  text-align: center;
+}
+
+.detail-card-committed .detail-badge {
+  background-color: rgb(116, 197, 233);
+  color: white;
+}
+
+.detail-card-complete .detail-badge {
+  background-color: rgb(165, 214, 167);
+  color: white;
+}
+
+.detail-card-incomplete .detail-badge {
+  background-color: rgb(255, 204, 128);
+  color: white;
+}
+
+.detail-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #172b4d;
+  margin: 0;
+}
+
+/* Issue Detail Table */
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.detail-table thead {
+  background-color: rgb(250, 250, 250);
+  border-top: 1px solid rgb(230, 230, 230);
+}
+
+.detail-table thead th {
+  text-align: left;
+  padding: 12px 20px;
+  font-weight: 600;
+  color: #6b778c;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-table tbody tr {
+  border-bottom: 1px solid rgb(240, 240, 240);
+}
+
+.detail-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.detail-table tbody tr:hover {
+  background-color: rgb(250, 250, 250);
+}
+
+.detail-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.detail-table tbody tr.clickable-row:hover {
+  background-color: rgb(235, 245, 255);
+}
+
+.detail-table tbody td {
+  padding: 14px 20px;
+  color: #172b4d;
+}
+
+.detail-key {
+  font-weight: 600;
+  color: #0052cc;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.detail-key:hover {
+  color: #0065ff;
+  text-decoration: underline;
+}
+
+/* Column widths */
+.detail-table thead th:nth-child(1),
+.detail-table tbody td:nth-child(1) {
+  width: 15%;
+}
+
+.detail-table thead th:nth-child(2),
+.detail-table tbody td:nth-child(2) {
+  width: 60%;
+}
+
+.detail-table thead th:nth-child(3),
+.detail-table tbody td:nth-child(3) {
+  width: 25%;
 }
