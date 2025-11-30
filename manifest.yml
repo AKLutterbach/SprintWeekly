@@ -16,6 +16,7 @@ modules:
         function: resolver
       title: Sprint Weekly
       layout: blank
+      icon: https://raw.githubusercontent.com/AKLutterbach/SprintWeekly/master/static/SprintWeeklyLogo.png
   jira:projectPage:
     - key: sprint-weekly-custom-page
       resource: sprint-report-ui
