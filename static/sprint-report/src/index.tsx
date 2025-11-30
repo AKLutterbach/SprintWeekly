@@ -180,7 +180,7 @@ const App: React.FC = () => {
             <div className="sw-card sw-header-card">
               <div className="sw-header-eyebrow">Sprint report</div>
               <h1 className="sw-header-title">
-                <img src="/SprintWeeklyLogo.png" alt="Sprint Weekly" className="sw-header-logo" />
+                <img src="./SprintWeeklyLogo.png" alt="Sprint Weekly" className="sw-header-logo" />
                 Sprint Weekly
               </h1>
               <p className="sw-header-subtitle">
