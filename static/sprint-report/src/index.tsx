@@ -179,7 +179,10 @@ const App: React.FC = () => {
             {/* Header Card */}
             <div className="sw-card sw-header-card">
               <div className="sw-header-eyebrow">Sprint report</div>
-              <h1 className="sw-header-title">Sprint Weekly</h1>
+              <h1 className="sw-header-title">
+                <img src="/SprintWeeklyLogo.png" alt="Sprint Weekly" className="sw-header-logo" />
+                Sprint Weekly
+              </h1>
               <p className="sw-header-subtitle">
                 Lightweight weekly status report for your active sprint.
               </p>

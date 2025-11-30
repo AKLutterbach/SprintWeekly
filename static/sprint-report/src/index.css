@@ -43,6 +43,14 @@ body {
   font-size: 26px;
   font-weight: 600;
   color: #172b4d;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sw-header-logo {
+  height: 32px;
+  width: auto;
 }
 
 .sw-header-subtitle {
