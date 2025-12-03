@@ -15,7 +15,6 @@ import api, { route } from '@forge/api';
  * - caches the result
  */
 export async function buildReport(payload: unknown) {
-  console.log('██████ BUILD REPORT V2.0 WITH DIRECT API CALL ██████');
   // Type assertion - runtime validation removed
   const req = payload as ReportRequest;
   if (!req || !req.requestId) {
@@ -53,15 +52,9 @@ export async function buildReport(payload: unknown) {
   const projectKey = (req.scope as any).id || (req.scope as any).ref;
   const useSprintMode = (req as any).useSprintMode;
   
-  console.log('=== BUILDING JQL ===');
-  console.log('projectKey:', projectKey);
-  console.log('useSprintMode:', useSprintMode);
-  console.log('sprintId:', sprintId);
-  
   if (useSprintMode && sprintId) {
     // Sprint mode: use sprint = <sprintId>
     jql = `project = "${projectKey}" AND sprint = ${sprintId}`;
-    console.log('SPRINT MODE JQL:', jql);
     log.info('Using sprint mode JQL', { jql, projectKey, sprintId });
   } else {
     // Manual date mode: use date range
@@ -69,27 +62,19 @@ export async function buildReport(payload: unknown) {
     const startDate = (req.window as any)?.start;
     const endDate = (req.window as any)?.end;
     jql = `project = "${projectKey}" AND created >= "${startDate}" AND created <= "${endDate}"`;
-    console.log('MANUAL DATE MODE JQL:', jql);
-    console.log('Date range:', startDate, 'to', endDate);
     log.info('Using manual date mode JQL', { jql, projectKey, startDate, endDate });
   }
 
-  console.log('=== FINAL JQL ===:', jql);
   log.info('Final search JQL', { jql });
 
   // Direct API call to bypass caching issues
-  console.log('Calling Jira search API directly with JQL:', jql);
-  
   const searchResponse = await api.asUser().requestJira(
     route`/rest/api/3/search/jql?jql=${jql}&maxResults=100&fields=key,summary,status,assignee,customfield_10002,issuetype,labels,created`
   );
-  console.log('Search response status:', searchResponse.status);
   
   const searchData = await searchResponse.json();
-  console.log(`Search API returned: total=${searchData.total || 0}, issues=${searchData.issues?.length || 0}`);
   const rawIssues = searchData.issues || [];
   
-  console.log(`=== FOUND ${rawIssues.length} ISSUES ===`);
   log.info(`Found ${rawIssues.length} issues from search`);
 
   // map to Issue shape expected by computeMetrics
@@ -208,6 +193,29 @@ export async function buildReport(payload: unknown) {
     }
   };
 
+  // Fetch project details to get the actual project name
+  let projectName = projectKey;
+  try {
+    const projectResponse = await api.asApp().requestJira(route`/rest/api/3/project/${projectKey}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    const projectData = await projectResponse.json();
+    projectName = projectData.name || projectKey;
+  } catch (err) {
+    log.info('Failed to fetch project name, using key', { err });
+  }
+
+  // Get sprint dates if in sprint mode
+  let sprintStartDate = (req.window as any)?.start;
+  let sprintEndDate = (req.window as any)?.end;
+  const sprintName = (payload as any).sprint?.name;
+  
+  if (useSprintMode && sprintId && (payload as any).sprint) {
+    // Use dates from sprint object if available
+    sprintStartDate = (payload as any).sprint.startDate || sprintStartDate;
+    sprintEndDate = (payload as any).sprint.endDate || sprintEndDate;
+  }
+
   const reportPayload = {
     requestId,
     generatedAt: new Date().toISOString(),
@@ -218,7 +226,11 @@ export async function buildReport(payload: unknown) {
       completed: completedIssues,
       uncompleted: uncompletedIssues,
       carryoverBlockers: carryoverBlockers
-    }
+    },
+    sprintName: sprintName,
+    projectName: projectName,
+    startDate: sprintStartDate,
+    endDate: sprintEndDate
   };
 
   try {

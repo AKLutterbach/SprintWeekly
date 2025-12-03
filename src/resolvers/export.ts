@@ -30,11 +30,13 @@ interface ExportRequest {
 }
 
 /**
- * Format date from YYYY-MM-DD to "Mon DD, YYYY" format
+ * Format date from ISO string or YYYY-MM-DD to "Mon DD, YYYY" format
  */
 function formatDate(dateStr: string): string {
   if (!dateStr) return '';
-  const date = new Date(dateStr + 'T00:00:00');
+  // Handle both ISO datetime strings (2025-11-11T03:39:27.522Z) and simple date strings (2025-11-11)
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return 'Invalid Date';
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -96,12 +98,10 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   doc.setFontSize(24);
   doc.setFont('Inter', 'bold');
   doc.setTextColor(49, 49, 49);  // #313131
-  // Split long titles if needed (max width: 65% of content width to leave room for right side)
-  const maxTitleWidth = contentWidth * 0.65;
-  const titleLines = doc.splitTextToSize(reportTitle, maxTitleWidth);
-  doc.text(titleLines, margin, yPos);
+  // Don't wrap title - let it extend to the right margin area
+  doc.text(reportTitle, margin, yPos);
   doc.setTextColor(0, 0, 0);
-  const titleHeight = titleLines.length * 9;
+  const titleHeight = 9;
   
   // Right side - Reporting period (smaller text, 2 lines)
   // Calculate offset so top of 8pt text aligns with top of 24pt text
@@ -415,17 +415,21 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     doc.text(title, margin + badgeWidth + 3, titleTextY);
     
     if (issueList.length === 0) {
-      doc.setFontSize(10);
-      doc.setFont('Inter', 'italic');
-      doc.setTextColor(120, 120, 120);
-      doc.text('No issues in this category', margin + 3, yPos + 4);
-      doc.setTextColor(0, 0, 0);
+      const textYPos = yPos + 6; // Store text position before adjusting yPos
+      yPos += 6; // Add 6pt space above the text
       yPos += 14;
       yPos += SECTION_PADDING;
+      
+      // Reduce height by 6pt for empty tables
+      yPos -= 6;
       
       // Don't draw filled background - just border
       const sectionEndY = yPos;
       const actualHeight = sectionEndY - sectionStartY;
+      
+      // Draw light grey background for empty tables
+      doc.setFillColor(245, 245, 245);
+      doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, containerBorderRadius, containerBorderRadius, 'F');
       
       // Draw subtle border around container - matches header background color
       doc.setDrawColor(...getLightColor(badgeColor));
@@ -442,7 +446,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       doc.setFillColor(...badgeColor);
       doc.roundedRect(margin, badgeY, badgeWidth, badgeHeight, 1, 1, 'F');
       doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
-      doc.setFontSize(14);
+      doc.setFontSize(8);
       doc.setFont('Inter', 'bold');
       doc.setTextColor(255, 255, 255);
       doc.text(String(issueList.length), margin + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 1, { align: 'center' });
@@ -450,10 +454,12 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       doc.setFontSize(14);
       doc.setFont('Inter', 'bold');
       doc.text(title, margin + badgeWidth + 3, titleTextY);
-      doc.setFontSize(10);
+      
+      // Draw 'No issues' text on top of background
+      doc.setFontSize(11);
       doc.setFont('Inter', 'italic');
-      doc.setTextColor(120, 120, 120);
-      doc.text('No issues in this category', margin + 3, yPos - SECTION_PADDING - 6);
+      doc.setTextColor(90, 90, 90);
+      doc.text('No issues in this category', margin + 3, textYPos + 4);
       doc.setTextColor(0, 0, 0);
       
       return;
@@ -565,10 +571,6 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   // Add spacing before first table
   yPos += 3;
 
-  // ========== COMMITTED ISSUES SECTION ==========
-  drawIssueTable('Committed', issues.completed.concat(issues.uncompleted, issues.carryoverBlockers || []), [23, 159, 219]); // Blue - all issues committed to sprint
-  yPos += TABLE_SECTION_SPACING;
-
   // ========== COMPLETE ISSUES SECTION ==========
   drawIssueTable('Complete', issues.completed, [87, 199, 115]); // Green - completed issues
   yPos += TABLE_SECTION_SPACING;
@@ -583,7 +585,14 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   doc.setTextColor(150, 150, 150);
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.text(`Generated ${generatedAt} by Sprint Weekly for Jira`, margin, pageHeight - 10);
+    // Non-bold part
+    doc.text(`Generated ${generatedAt} by `, margin, pageHeight - 10);
+    // Bold part
+    const nonBoldWidth = doc.getTextWidth(`Generated ${generatedAt} by `);
+    doc.setFont('Inter', 'bold');
+    doc.text('Sprint Weekly for Jira', margin + nonBoldWidth, pageHeight - 10);
+    // Reset to italic for page numbers
+    doc.setFont('Inter', 'italic');
     doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
   }
 

@@ -4,10 +4,10 @@
  * Can re-add validation later with a simpler approach.
  */
 
-// Scope: board | project | jql
+// Scope: project | jql
 export interface Scope {
-  type: 'board' | 'project' | 'jql';
-  ref: string; // board/project ID or JQL string
+  type: 'project' | 'jql';
+  ref: string; // project ID or JQL string
 }
 
 // Time window: calendar (start/end) or sprint (sprintId)

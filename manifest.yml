@@ -1,5 +1,6 @@
 app:
   id: ari:cloud:ecosystem::app/c4f2a82d-82a8-48a5-8d53-ed801749f46f
+  description: Generate clear, client-ready sprint reports from Jira in seconds.
   runtime:
     name: nodejs22.x
     architecture: arm64
@@ -16,7 +17,7 @@ modules:
         function: resolver
       title: Sprint Weekly
       layout: blank
-      icon: https://raw.githubusercontent.com/AKLutterbach/SprintWeekly/master/static/SprintWeeklyLogo.png
+      icon: https://raw.githubusercontent.com/AKLutterbach/SprintWeekly/master/static/thumbnail_logo.png
   jira:projectPage:
     - key: sprint-weekly-custom-page
       resource: sprint-report-ui
@@ -30,12 +31,7 @@ resources:
 
 permissions:
   scopes:
-    - read:jira-work
-    - read:issue:jira
-    - read:project:jira
-    - read:filter:jira
-    - read:issue-details:jira
-    - read:board-scope:jira-software
-    - read:board-scope.admin:jira-software
-    # Optional: allow uploads when we implement attachment exports
-    # - write:attachment:jira
+    - read:jira-work          # Required for JQL search to fetch sprint issues
+    - read:issue:jira         # Required to read issue details (summary, status, assignee)
+    - read:project:jira       # Required to list and fetch project details
+    - read:issue-details:jira # Required for custom field access (story points, labels)

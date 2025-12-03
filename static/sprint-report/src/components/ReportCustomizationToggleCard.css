@@ -1,0 +1,44 @@
+.rc-toggle-card {
+  background: #ffffff;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.08);
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rc-toggle-card:hover {
+  background: #f4f5f7;
+  border-color: #b3bac5;
+}
+
+.rc-toggle-card:focus {
+  outline: 2px solid #0052cc;
+  outline-offset: 2px;
+}
+
+.rc-toggle-card-icon {
+  color: #42526e;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.rc-toggle-card-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+  white-space: nowrap;
+}
+
+.rc-toggle-card-chevron {
+  color: #42526e;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}

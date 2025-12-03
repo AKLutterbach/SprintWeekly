@@ -7,19 +7,15 @@ import { asUser, route } from '@forge/api';
 
 // Simple scope -> JQL expansion helper. A `scope` may be either:
 // - { type: 'project', id: 'PRJKEY' }
-// - { type: 'board', id: '123' }
 // - { type: 'jql', jql: 'project = PRJ' }
 // The function returns a JQL string suitable for use with the Search API.
 export type Scope =
   | { type: 'project'; id: string }
-  | { type: 'board'; id: string }
   | { type: 'jql'; jql: string };
 
 /**
  * Convert a Scope into a JQL string.
  * - project -> `project = KEY`
- * - board -> fetch board configuration to find the project(s) behind it and return a JQL
- *           limiting to those projects. If board lookup fails, fall back to `issueKey IS NOT NULL`
  * - jql -> returned verbatim
  */
 export async function expandScopeToJQL(scope: Scope): Promise<string> {
@@ -27,47 +23,8 @@ export async function expandScopeToJQL(scope: Scope): Promise<string> {
     return scope.jql;
   }
 
-  if (scope.type === 'project') {
-    // simple project filter
-    return `project = ${escapeJqlValue(scope.id)}`;
-  }
-
-  // scope.type === 'board'
-  try {
-    const res = await asUser().requestJira(route`/rest/agile/1.0/board/${scope.id}`, {
-      method: 'GET'
-    });
-
-    if (!res || res.status !== 200) {
-      return 'issueKey IS NOT NULL';
-    }
-
-    const body = await res.json();
-    // The Agile board object can contain a 'location' with project info.
-    // If it exposes a projectKey, use project = KEY, otherwise fall back.
-    if (body && body.location && body.location.projectKey) {
-      return `project = ${escapeJqlValue(body.location.projectKey)}`;
-    }
-
-    // Some boards map to multiple projects; fetch associated projects endpoint.
-    const projRes = await asUser().requestJira(route`/rest/agile/1.0/board/${scope.id}/project`, {
-      method: 'GET'
-    });
-    if (projRes && projRes.status === 200) {
-      const pbody = await projRes.json();
-      if (Array.isArray(pbody) && pbody.length > 0) {
-        const keys = pbody.map((p: any) => `project = ${escapeJqlValue(p.key)}`);
-        return `(${keys.join(' OR ')})`;
-      }
-    }
-
-    return 'issueKey IS NOT NULL';
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (_) {
-    // On any error, return a permissive JQL so callers don't break; caller can
-    // detect `partial`/permission problems and surface them in the UI.
-    return 'issueKey IS NOT NULL';
-  }
+  // type === 'project'
+  return `project = ${escapeJqlValue(scope.id)}`;
 }
 
 /**

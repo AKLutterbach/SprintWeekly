@@ -42,7 +42,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background-color: #0052cc;
+  background-color: #0F2744;
   color: white;
   border: none;
   border-radius: 6px;
@@ -54,11 +54,11 @@
 }
 
 .export-pdf-button:hover {
-  background-color: #0065ff;
+  background-color: #1a3a5c;
 }
 
 .export-pdf-button:active {
-  background-color: #0747a6;
+  background-color: #0a1d33;
 }
 
 .export-pdf-button:disabled {
@@ -105,19 +105,19 @@
 /* Committed - Blue (#0052cc from Generate Report button) */
 .metric-card-committed {
   border-color: rgba(0, 82, 204, 0.3);
-  background-color: rgba(0, 82, 204, 0.08);
+  background-color: rgba(217, 229, 246, 1);
 }
 
 /* Complete - Light Green */
 .metric-card-complete {
   border-color: rgba(209, 242, 211, 1);
-  background-color: rgba(209, 242, 211, 0.3);
+  background-color: rgba(237, 250, 238, 1);
 }
 
 /* Incomplete - Light Orange */
 .metric-card-incomplete {
   border-color: rgba(255, 238, 201, 1);
-  background-color: rgba(255, 238, 201, 0.3);
+  background-color: rgba(255, 247, 230, 1);
 }
 
 .card-content {

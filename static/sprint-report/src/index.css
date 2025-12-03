@@ -15,6 +15,33 @@ body {
   min-height: 100vh;
 }
 
+/* ========================================
+   Loading Indicator Styles
+   ======================================== */
+
+.sw-loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+  margin-bottom: 16px;
+}
+
+.sw-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #dfe1e6;
+  border-top-color: #0F2744;
+  border-radius: 50%;
+  animation: sw-spin 0.8s linear infinite;
+}
+
+@keyframes sw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Sprint Weekly Page Styles */
 .sw-page {
   max-width: 1100px;
@@ -49,7 +76,7 @@ body {
 }
 
 .sw-header-logo {
-  height: 48px;
+  height: 56.16px;
   width: auto;
 }
 
@@ -70,13 +97,13 @@ body {
 
 /* Hero Section - grey background container for header and customization */
 .sw-hero-section {
-  background: #f4f5f7;
-  padding: 24px 0 32px;
+  padding: 24px 0 12px;
 }
 
 .sw-hero-inner {
   max-width: 1100px;
   margin: 0 auto;
+  padding: 0 48px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -108,8 +135,146 @@ body {
   border-radius: 12px;
 }
 
-.sw-header p {
-  margin: 0;
-  font-size: 14px;
-  color: #6b778c;
+/* Customization Card - Initial state before report generation */
+.sw-customization-card-initial {
+  /* inherits .sw-card styles */
 }
+
+/* Customization Rail - Narrow vertical panel docked to right edge */
+.sw-customization-rail {
+  position: fixed;
+  top: 24px;
+  right: 0;
+  width: 36px;
+  height: auto;
+  background: #0F2744;
+  border: 1px solid #0F2744;
+  border-right: none;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  box-shadow: 0 2px 8px rgba(9, 30, 66, 0.15);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  animation: slideInFromRight 600ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Rail Toggle Button */
+.sw-rail-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 16px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border-radius: 8px;
+  transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sw-rail-toggle-btn:hover {
+  color: #deebff;
+}
+
+.sw-rail-toggle-btn:active {
+  color: #b3d4ff;
+}
+
+/* Rail Text - Vertical writing mode */
+.sw-rail-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Customization Drawer - Overlay panel */
+.sw-customization-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 395px;
+  height: 100vh;
+  background: #0F2744;
+  box-shadow: -4px 0 16px rgba(9, 30, 66, 0.2);
+  z-index: 100;
+  overflow-y: auto;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sw-customization-drawer.open {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.sw-customization-drawer.closed {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Drawer Content Padding */
+.sw-drawer-content {
+  padding: 24px;
+  position: relative;
+  padding-top: 56px;
+}
+
+/* Drawer Close Button - X in top left */
+.sw-drawer-close-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: transparent;
+  border: none;
+  color: #42526e;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sw-drawer-close-btn:hover {
+  background-color: #f4f5f7;
+  color: #172b4d;
+}
+
+.sw-drawer-close-btn:active {
+  background-color: #ebecf0;
+}
+
+/* Drawer Backdrop */
+.sw-drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(97, 97, 97, 0.54);
+  z-index: 95;
+  transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+

@@ -29,24 +29,17 @@ resolver.define('getText', () => {
 
 // Wire report.build to our typed implementation
 resolver.define('report.build', async (req) => {
-  // Debug logging
-  console.log('report.build called with req:', JSON.stringify(req));
-  
   // Our typed buildReport expects the payload object
   // When called from invoke(), the payload is the first arg directly
   const payload = (req && req.payload) ? req.payload : req;
-  console.log('Extracted payload:', JSON.stringify(payload));
   
   const result = await buildReport(payload);
-  console.log('buildReport returned:', JSON.stringify(result));
   
   return result;
 });
 
 // Get all projects accessible to the user
 resolver.define('getProjects', async () => {
-  console.log('getProjects called');
-  
   try {
     const response = await api.asUser().requestJira(route`/rest/api/3/project/search?maxResults=100&orderBy=name`);
     const data = await response.json();
@@ -58,7 +51,6 @@ resolver.define('getProjects', async () => {
         name: project.name,
         id: project.id
       }));
-      console.log(`Found ${projects.length} projects`);
       return { projects };
     }
     
@@ -73,8 +65,6 @@ resolver.define('getProjects', async () => {
 // Note: Team-managed (simplified) boards don't support the Agile API sprint endpoints
 // So we use JQL to discover sprints and then fetch their details
 resolver.define('getSprintsForProject', async (req) => {
-  console.log('getSprintsForProject called with:', JSON.stringify(req));
-  
   // Extract payload similar to report.build
   const payload: any = (req && (req as any).payload) ? (req as any).payload : req;
   const projectKey = payload?.projectKey;
@@ -84,21 +74,16 @@ resolver.define('getSprintsForProject', async (req) => {
   }
   
   try {
-    console.log(`Fetching sprints for project ${projectKey} using JQL approach`);
-    
     // Use JQL to find issues with sprint field populated
     // This works for both team-managed and company-managed projects
     const jql = `project = "${projectKey}" AND sprint is not EMPTY ORDER BY sprint DESC`;
-    console.log(`Using JQL: ${jql}`);
     
     const issuesResponse = await api.asUser().requestJira(
       route`/rest/api/3/search/jql?jql=${jql}&fields=*all&maxResults=100`
     );
     const issuesData = await issuesResponse.json();
-    console.log(`Found ${issuesData.total || 0} issues with sprints`);
     
     if (!issuesData || !issuesData.issues || issuesData.issues.length === 0) {
-      console.log(`No issues with sprints found for project ${projectKey}`);
       return { sprints: [] };
     }
     
@@ -107,7 +92,6 @@ resolver.define('getSprintsForProject', async (req) => {
     
     for (const issue of issuesData.issues) {
       const fields = issue.fields || {};
-      console.log(`Issue ${issue.key} has ${Object.keys(fields).length} fields`);
       
       // Try multiple possible sprint field names
       let sprintField = fields.sprint || fields.customfield_10020 || fields.customfield_10010;
@@ -118,7 +102,6 @@ resolver.define('getSprintsForProject', async (req) => {
           key.toLowerCase().includes('sprint') && fields[key]
         );
         if (sprintFieldKey) {
-          console.log(`Found sprint field: ${sprintFieldKey}`);
           sprintField = fields[sprintFieldKey];
         }
       }
@@ -128,14 +111,12 @@ resolver.define('getSprintsForProject', async (req) => {
       
       for (const sprint of sprints) {
         if (sprint && sprint.id && !sprintMap.has(sprint.id)) {
-          console.log(`Found sprint: ${sprint.id} - ${sprint.name} (${sprint.state})`);
           sprintMap.set(sprint.id, sprint);
         }
       }
     }
     
     if (sprintMap.size === 0) {
-      console.log(`No valid sprints extracted for project ${projectKey}`);
       return { sprints: [] };
     }
     
@@ -154,7 +135,6 @@ resolver.define('getSprintsForProject', async (req) => {
       endDate: sprint.endDate
     }));
     
-    console.log(`Returning ${sprints.length} unique sprints for project ${projectKey}`);
     return { sprints };
   } catch (error: any) {
     console.error('Error fetching sprints:', error);

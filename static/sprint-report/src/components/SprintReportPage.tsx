@@ -19,22 +19,9 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
   const { overview, issues } = data;
   const [loading, setLoading] = React.useState(false);
 
-  // Debug logging to understand metric counts
-  console.log('Report Data:', {
-    overview,
-    issues,
-    committedTotal: overview.committed.total,
-    completedTotal: overview.completed.total,
-    incompleteTotal: overview.incomplete.total,
-    completedIssuesCount: issues?.completed?.length,
-    uncompletedIssuesCount: issues?.uncompleted?.length
-  });
-
   // Categorize issues correctly based on backend data structure
-  // committed = all issues in the sprint (completed + uncompleted)
   // complete = issues that were completed
   // incomplete = issues that remain uncompleted
-  const committedIssues = [...(issues?.completed || []), ...(issues?.uncompleted || [])];
   const completeIssues = issues?.completed || [];
   const incompleteIssues = issues?.uncompleted || [];
 
@@ -43,15 +30,11 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
    * When the modal is closed, refreshes the report data to reflect any changes.
    */
   const openIssueModal = async (issueKey: string): Promise<void> => {
-    console.log('Opening ViewIssueModal for', issueKey);
-
     const modal = new ViewIssueModal({
-      context: { issueKey },          // MUST be the key, e.g. "SPRIN-1"
+      context: { issueKey },
       onClose: async () => {
-        console.log('ViewIssueModal closed');
         // Refresh the report data when dialog closes
         if (onRefresh) {
-          console.log('Refreshing report data...');
           await onRefresh();
         }
       },
@@ -103,13 +86,7 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
         endDate: data.endDate
       };
       
-      console.log('Exporting PDF with:', exportRequest);
-      
       const response: any = await invoke('export.report', exportRequest);
-      
-      console.log('Export response:', response);
-      console.log('Response type:', typeof response);
-      console.log('Response keys:', Object.keys(response || {}));
       
       if (response.error) {
         throw new Error(response.error);
@@ -119,11 +96,8 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
       const pdfData = response.base64 || response.pdf || response.data;
       
       if (!pdfData) {
-        console.error('No PDF data in response:', response);
-        throw new Error('No PDF data received from server');
+        throw new Error('No PDF data received');
       }
-      
-      console.log('PDF data length:', pdfData.length);
       
       // Convert base64 to blob and download
       const byteCharacters = atob(pdfData);
@@ -134,22 +108,18 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'application/pdf' });
       
-      console.log('Blob created, size:', blob.size);
-      
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `sprint-report-${data.sprintName || 'report'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      link.download = `${data.projectName || 'Sprint'}-Report-${Date.now()}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      console.log('PDF download triggered');
     } catch (err) {
       console.error('Error exporting PDF:', err);
-      alert('Failed to export PDF: ' + (err as Error).message);
+      alert('Unable to export PDF. Please try again or contact your Jira admin if the problem persists.');
     } finally {
       setLoading(false);
     }
@@ -160,7 +130,8 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
       <div className="report-header">
         <div className="header-content">
           <div className="header-text">
-            <h1 className="report-title">Sprint Status Overview</h1>
+            <h1 className="report-title">{data.projectName ? `${data.projectName} Sprint Report` : 'Sprint Report'}</h1>
+            <p className="report-subtitle">{data.sprintName || ''}</p>
           </div>
           <button className="export-pdf-button" onClick={handleExportPDF} disabled={loading}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -216,7 +187,7 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
           <div className="small-cards">
             <div className="small-card">
               <div className="small-card-value">{overview.completed.breakdown.fromLastSprint}</div>
-              <div className="small-card-label">Carried from last sprint</div>
+              <div className="small-card-label">From last sprint</div>
             </div>
             <div className="small-card">
               <div className="small-card-value">{overview.completed.breakdown.plannedAtStart}</div>
@@ -244,7 +215,7 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
           <div className="small-cards">
             <div className="small-card">
               <div className="small-card-value">{overview.incomplete.breakdown.fromLastSprint}</div>
-              <div className="small-card-label">Carried from last sprint</div>
+              <div className="small-card-label">From last sprint</div>
             </div>
             <div className="small-card">
               <div className="small-card-value">{overview.incomplete.breakdown.plannedAtStart}</div>
@@ -262,43 +233,6 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
       <div className="status-detail-section">
         <h2 className="status-detail-title">Sprint Status Detail</h2>
         
-        {/* Committed Issues */}
-        {committedIssues.length > 0 && (
-          <div className="detail-card detail-card-committed">
-            <div className="detail-header">
-              <span className="detail-badge">{committedIssues.length}</span>
-              <h3 className="detail-title">Committed</h3>
-            </div>
-            <table className="detail-table">
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Summary</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {committedIssues.map((issue) => (
-                  <tr 
-                    key={issue.key}
-                    className="clickable-row"
-                    onClick={() => openIssueModal(issue.key)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <span className="detail-key">
-                        {issue.key}
-                      </span>
-                    </td>
-                    <td>{issue.summary}</td>
-                    <td>{issue.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
         {/* Complete Issues */}
         {completeIssues.length > 0 && (
           <div className="detail-card detail-card-complete">
@@ -337,7 +271,7 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
         )}
 
         {/* Incomplete Issues */}
-        {incompleteIssues.length > 0 && (
+        {incompleteIssues.length > 0 ? (
           <div className="detail-card detail-card-incomplete">
             <div className="detail-header">
               <span className="detail-badge">{incompleteIssues.length}</span>
@@ -370,6 +304,16 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : (
+          <div className="detail-card detail-card-incomplete">
+            <div className="detail-header">
+              <span className="detail-badge">0</span>
+              <h3 className="detail-title">Incomplete</h3>
+            </div>
+            <div className="empty-state">
+              <p style={{ fontStyle: 'italic', color: '#6b778c', padding: '24px', paddingLeft: '16px', textAlign: 'left' }}>No incomplete issues</p>
+            </div>
           </div>
         )}
       </div>
