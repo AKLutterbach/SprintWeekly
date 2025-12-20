@@ -205,15 +205,24 @@ export async function buildReport(payload: unknown) {
     log.info('Failed to fetch project name, using key', { err });
   }
 
-  // Get sprint dates if in sprint mode
+  // Get sprint details if in sprint mode
   let sprintStartDate = (req.window as any)?.start;
   let sprintEndDate = (req.window as any)?.end;
-  const sprintName = (payload as any).sprint?.name;
+  let sprintName = (payload as any).sprint?.name;
   
-  if (useSprintMode && sprintId && (payload as any).sprint) {
-    // Use dates from sprint object if available
-    sprintStartDate = (payload as any).sprint.startDate || sprintStartDate;
-    sprintEndDate = (payload as any).sprint.endDate || sprintEndDate;
+  if (useSprintMode && sprintId) {
+    // Fetch sprint details from Jira API
+    try {
+      const sprintResponse = await api.asUser().requestJira(route`/rest/agile/1.0/sprint/${sprintId}`);
+      const sprintData = await sprintResponse.json();
+      sprintName = sprintData.name || `Sprint ${sprintId}`;
+      sprintStartDate = sprintData.startDate || sprintStartDate;
+      sprintEndDate = sprintData.endDate || sprintEndDate;
+      log.info('Fetched sprint details', { sprintName, sprintStartDate, sprintEndDate });
+    } catch (err) {
+      log.info('Failed to fetch sprint details, using defaults', { err });
+      sprintName = sprintName || `Sprint ${sprintId}`;
+    }
   }
 
   const reportPayload = {

@@ -21,11 +21,15 @@ export const METRIC_CARD_STYLES = {
   },
   
   colors: {
-    committed: [33, 150, 243] as [number, number, number], // Blue
+    committed: [151, 185, 234] as [number, number, number], // #97B9EA - Blue border
     complete: [76, 175, 80] as [number, number, number], // Green
     incomplete: [255, 152, 0] as [number, number, number], // Orange
-    cardBackground: [245, 245, 245] as [number, number, number], // Light gray
+    cardBackground: [245, 245, 245] as [number, number, number], // Light gray (default for small cards)
     smallCardBorder: [220, 220, 220] as [number, number, number], // Border gray
+    // PDF large card backgrounds
+    committedBackground: [217, 229, 246] as [number, number, number], // #D9E5F6 - Light blue
+    completeBackground: [237, 250, 238] as [number, number, number], // #EDFAEE - Light green
+    incompleteBackground: [255, 247, 230] as [number, number, number], // #FFF7E6 - Light yellow
   },
   
   typography: {

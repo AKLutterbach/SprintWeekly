@@ -167,14 +167,19 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   ];
   
   // Use light pastel colors for metric card borders (same as table header backgrounds)
-  const lightCommitted = getLightColor(cardColors.committed);
+  // Committed uses 40% white blend to balance visibility with lightness
+  const lightCommitted: [number, number, number] = [
+    Math.round(cardColors.committed[0] * 0.6 + 255 * 0.4),
+    Math.round(cardColors.committed[1] * 0.6 + 255 * 0.4),
+    Math.round(cardColors.committed[2] * 0.6 + 255 * 0.4)
+  ];
   const lightComplete = getLightColor(cardColors.complete);
   const lightIncomplete = getLightColor(cardColors.incomplete);
   
-  // Helper function to draw a rounded rectangle card with optional colored border
-  const drawCard = (x: number, y: number, w: number, h: number, borderColor?: [number, number, number], isSmall: boolean = false) => {
-    // Always use light gray fill for card background
-    const [r, g, b] = cardColors.cardBackground;
+  // Helper function to draw a rounded rectangle card with optional colored border and background
+  const drawCard = (x: number, y: number, w: number, h: number, borderColor?: [number, number, number], isSmall: boolean = false, backgroundColor?: [number, number, number]) => {
+    // Use provided background color, or default to light gray for small cards
+    const [r, g, b] = backgroundColor || cardColors.cardBackground;
     doc.setFillColor(r, g, b);
     
     const radius = isSmall ? smallCardRadius : cardRadius;
@@ -209,6 +214,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       value: committedTotal,
       subtitle: 'Issues the team committed to this sprint',
       color: lightCommitted,
+      backgroundColor: cardColors.committedBackground,
       breakdown: [
         { label: 'From last\nsprint', value: byStatus?.committed?.breakdown?.fromLastSprint ?? (metrics.committedCarryover || 0) },
         { label: 'Planned at\nstart', value: byStatus?.committed?.breakdown?.plannedAtStart ?? Math.max(0, (metrics.committedAtStart || 0) - (metrics.committedCarryover || 0) - (metrics.addedMidSprint || 0)) },
@@ -221,6 +227,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       value: completeTotal,
       subtitle: 'Issues finished by the end of this sprint',
       color: lightComplete,
+      backgroundColor: cardColors.completeBackground,
       breakdown: byStatus?.complete?.breakdown ? [
         { label: 'From last\nsprint', value: byStatus.complete.breakdown.fromLastSprint || 0 },
         { label: 'Planned at\nstart', value: byStatus.complete.breakdown.plannedAtStart || 0 },
@@ -241,6 +248,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       value: incompleteTotal,
       subtitle: 'Issues not finished by the end of this sprint',
       color: lightIncomplete,
+      backgroundColor: cardColors.incompleteBackground,
       breakdown: byStatus?.incomplete?.breakdown ? [
         { label: 'From last\nsprint', value: byStatus.incomplete.breakdown.fromLastSprint || 0 },
         { label: 'Planned at\nstart', value: byStatus.incomplete.breakdown.plannedAtStart || 0 },
@@ -258,8 +266,8 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   ];
 
   columns.forEach(col => {
-    // Large card with color
-    drawCard(col.x, cardsY, columnWidth, largeCardHeight, col.color, false);
+    // Large card with color and background
+    drawCard(col.x, cardsY, columnWidth, largeCardHeight, col.color, false, col.backgroundColor);
     doc.setFontSize(typography.largeCard.title.fontSize);
     doc.setFont('Inter', typography.largeCard.title.fontWeight);
     const [tr, tg, tb] = typography.largeCard.title.color;
@@ -331,12 +339,23 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   const PILL_TO_TABLE_SPACING = 8;
 
   // Helper to draw rectangle with only top corners rounded
-  const drawTopRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
-    // Draw main rectangle
-    doc.rect(x, y + r, w, h - r, 'F');
-    
-    // Draw top portion with rounded corners
-    doc.roundedRect(x, y, w, r * 2, r, r, 'F');
+  const drawTopRoundedRect = (x: number, y: number, w: number, h: number, r: number, strokeMode: boolean = false) => {
+    if (strokeMode) {
+      // For borders: just draw a complete rounded rectangle
+      // jsPDF doesn't handle partial rounding well, so we'll accept fully rounded for now
+      doc.roundedRect(x, y, w, h, r, r, 'S');
+    } else {
+      // For fills: draw filled rectangles
+      doc.rect(x, y + r, w, h - r, 'F');
+      doc.roundedRect(x, y, w, r * 2, r, r, 'F');
+    }
+  };
+  
+  // Helper to draw rectangle with only bottom corners rounded
+  const drawBottomRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
+    // For borders: just draw a complete rounded rectangle
+    // jsPDF doesn't handle partial rounding well, so we'll accept fully rounded for now
+    doc.roundedRect(x, y, w, h, r, r, 'S');
   };
   
   // Convert 5px to mm for consistent border radius (1px ≈ 0.264mm, so 5px ≈ 1.32mm)
@@ -368,80 +387,112 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
 
   // ========== HELPER FUNCTION FOR ISSUE TABLES ==========
   const drawIssueTable = (title: string, issueList: any[], badgeColor: [number, number, number]) => {
-    // Check if we have space for section title + badge + header (minimum 30mm)
+    // Helper to draw section header (title + badge + table header)
+    const drawSectionHeader = () => {
+      const sectionStartY = yPos;
+      
+      // Add padding before section content
+      yPos += SECTION_PADDING;
+      
+      // Store pill position for title and badge centering
+      const pillY = yPos;
+      
+      // Draw colored background bar starting at container top
+      const colorBarHeight = SECTION_PADDING + PILL_TO_TABLE_SPACING;
+      doc.setFillColor(...getLightColor(badgeColor));
+      // Always draw with rounded top for visual consistency
+      drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, containerBorderRadius);
+      
+      // Calculate centered Y position for title text baseline
+      const titleTextY = pillY + (PILL_TO_TABLE_SPACING / 2);
+      
+      // Draw badge with count - centered at same height as title
+      const badgeWidth = 6;
+      const badgeHeight = 5;
+      const badgeY = titleTextY - (badgeHeight / 2) - 2;
+      
+      // Draw badge with 50% transparency
+      doc.setGState(new (doc as any).GState({ opacity: 0.5 }));
+      doc.setFillColor(...badgeColor);
+      doc.roundedRect(margin, badgeY, badgeWidth, badgeHeight, 1, 1, 'F');
+      doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
+      
+      doc.setFontSize(8);
+      doc.setFont('Inter', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text(String(issueList.length), margin + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 1, { align: 'center' });
+      doc.setTextColor(0, 0, 0);
+      
+      // Move down to reserve space for title
+      yPos += PILL_TO_TABLE_SPACING;
+      
+      // Section title
+      doc.setFontSize(14);
+      doc.setFont('Inter', 'bold');
+      doc.text(title, margin + badgeWidth + 3, titleTextY);
+      
+      return sectionStartY;
+    };
+    
+    // Helper to close out current page's section container
+    const closeSectionContainer = (containerStartY: number, isFirstPage: boolean, isLastPage: boolean) => {
+      const containerEndY = yPos + SECTION_PADDING;
+      const containerHeight = containerEndY - containerStartY;
+      
+      // Draw section border with appropriate corner rounding
+      doc.setDrawColor(...getLightColor(badgeColor));
+      doc.setLineWidth(0.2);
+      
+      if (isFirstPage && isLastPage) {
+        // Single-page section: all corners rounded
+        doc.roundedRect(margin - 3, containerStartY, contentWidth + 6, containerHeight, containerBorderRadius, containerBorderRadius, 'S');
+      } else if (isFirstPage) {
+        // First page of multi-page: top rounded, bottom square
+        drawTopRoundedRect(margin - 3, containerStartY, contentWidth + 6, containerHeight, containerBorderRadius, true);
+      } else if (isLastPage) {
+        // Last page of multi-page: top square, bottom rounded
+        drawBottomRoundedRect(margin - 3, containerStartY, contentWidth + 6, containerHeight, containerBorderRadius);
+      } else {
+        // Middle page: all square corners
+        doc.rect(margin - 3, containerStartY, contentWidth + 6, containerHeight, 'S');
+      }
+      
+      doc.setDrawColor(0, 0, 0);
+    };
+    
+    // Check if we have space for section header (minimum 30mm)
     checkPageBreak(30);
     
-    // Store section start position
-    const sectionStartY = yPos;
-    
-    // Add padding before section content
-    yPos += SECTION_PADDING;
-    
-    // Store pill position for title and badge centering
-    const pillY = yPos;
-    
-    // Draw colored background bar starting at container top
-    const colorBarHeight = SECTION_PADDING + PILL_TO_TABLE_SPACING;
-    doc.setFillColor(...getLightColor(badgeColor));
-    drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, containerBorderRadius);
-    
-    // Calculate centered Y position for title text baseline
-    const titleTextY = pillY + (PILL_TO_TABLE_SPACING / 2);
-    
-    // Draw badge with count - centered at same height as title
-    const badgeWidth = 6;
-    const badgeHeight = 5;
-    // Font size 14 has descender/ascender, so badge center should be ~2mm above baseline
-    const badgeY = titleTextY - (badgeHeight / 2) - 2;
-    
-    // Draw badge with 50% transparency
-    doc.setGState(new (doc as any).GState({ opacity: 0.5 }));
-    doc.setFillColor(...badgeColor);
-    doc.roundedRect(margin, badgeY, badgeWidth, badgeHeight, 1, 1, 'F');
-    doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
-    
-    doc.setFontSize(8);
-    doc.setFont('Inter', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text(String(issueList.length), margin + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 1, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    
-    // Move down to reserve space for title
-    yPos += PILL_TO_TABLE_SPACING;
-    
-    // Section title - centered vertically in the spacing area, aligned with badge
-    doc.setFontSize(14);
-    doc.setFont('Inter', 'bold');
-    doc.text(title, margin + badgeWidth + 3, titleTextY);
+    // Draw initial section header
+    let currentPageSectionStart = drawSectionHeader();
+    let isFirstPageSegment = true;
     
     if (issueList.length === 0) {
-      const textYPos = yPos + 6; // Store text position before adjusting yPos
-      yPos += 6; // Add 6pt space above the text
+      const textYPos = yPos + 6;
+      yPos += 6;
       yPos += 14;
       yPos += SECTION_PADDING;
       
-      // Reduce height by 6pt for empty tables
-      yPos -= 6;
-      
-      // Don't draw filled background - just border
-      const sectionEndY = yPos;
-      const actualHeight = sectionEndY - sectionStartY;
-      
-      // Draw light grey background for empty tables
+      // Draw grey background filling entire container first
+      // Note: closeSectionContainer adds SECTION_PADDING to yPos, so we match that here
+      const containerHeight = (yPos + SECTION_PADDING) - currentPageSectionStart;
       doc.setFillColor(245, 245, 245);
-      doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, containerBorderRadius, containerBorderRadius, 'F');
+      doc.roundedRect(margin - 3, currentPageSectionStart, contentWidth + 6, containerHeight, containerBorderRadius, containerBorderRadius, 'F');
       
-      // Draw subtle border around container - matches header background color
-      doc.setDrawColor(...getLightColor(badgeColor));
-      doc.setLineWidth(0.2);
-      doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, containerBorderRadius, containerBorderRadius, 'S');
-      doc.setDrawColor(0, 0, 0);
+      // Close section container for empty table (draws border)
+      closeSectionContainer(currentPageSectionStart, true, true);
       
-      // Redraw colored background bar
+      // Redraw colored header bar on top
+      const colorBarHeight = SECTION_PADDING + PILL_TO_TABLE_SPACING;
       doc.setFillColor(...getLightColor(badgeColor));
-      drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, containerBorderRadius);
+      drawTopRoundedRect(margin - 3, currentPageSectionStart, contentWidth + 6, colorBarHeight, containerBorderRadius);
       
-      // Redraw badge and text on top of background
+      const pillY = currentPageSectionStart + SECTION_PADDING;
+      const titleTextY = pillY + (PILL_TO_TABLE_SPACING / 2);
+      const badgeWidth = 6;
+      const badgeHeight = 5;
+      const badgeY = titleTextY - (badgeHeight / 2) - 2;
+      
       doc.setGState(new (doc as any).GState({ opacity: 0.5 }));
       doc.setFillColor(...badgeColor);
       doc.roundedRect(margin, badgeY, badgeWidth, badgeHeight, 1, 1, 'F');
@@ -455,7 +506,6 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       doc.setFont('Inter', 'bold');
       doc.text(title, margin + badgeWidth + 3, titleTextY);
       
-      // Draw 'No issues' text on top of background
       doc.setFontSize(11);
       doc.setFont('Inter', 'italic');
       doc.setTextColor(90, 90, 90);
@@ -490,10 +540,17 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       const totalRowSpace = rowHeight + (index < issueList.length - 1 ? ROW_SEPARATOR_HEIGHT : 0);
       
       // Check if entire row fits on current page
-      // If not, add new page and redraw header
-      if (yPos + totalRowSpace > maxY) {
+      if (yPos + totalRowSpace + SECTION_PADDING > maxY) {
+        // Close current page's section container (not last page)
+        closeSectionContainer(currentPageSectionStart, isFirstPageSegment, false);
+        isFirstPageSegment = false;
+        
+        // Add new page
         doc.addPage();
         yPos = 25;
+        
+        // Redraw section header on new page (not first page)
+        currentPageSectionStart = drawSectionHeader();
         drawTableHeader(keyColX, summaryColX, statusColX);
       }
       
@@ -504,27 +561,20 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       doc.setFillColor(255, 255, 255);
       doc.rect(margin, cellTop, contentWidth, rowHeight, 'F');
       
-      // Center the text block vertically: start at top padding, then add half the available space
-      // Font size is 10, so single line ~3.5mm, we want it centered in the textHeight space
       const textStartY = cellTop + ROW_PADDING_TOP + 3.5;
       
-      // Draw the row text - all columns aligned at same Y position
-      // Key column
+      // Draw the row text
       doc.setFont('Inter', 'bold');
       doc.text(key, keyColX + 2, textStartY);
       
-      // Summary column (wrapped)
       doc.setFont('Inter', 'normal');
       doc.text(summaryLines, summaryColX + 2, textStartY);
-      
-      // Status column
-      doc.setFont('Inter', 'normal');
       doc.text(status, statusColX + 2, textStartY);
       
       // Move past the entire row
       yPos += rowHeight;
       
-      // Draw subtle row separator BELOW the row (not through the text)
+      // Draw subtle row separator
       if (index < issueList.length - 1) {
         doc.setDrawColor(240, 240, 240);
         doc.setLineWidth(ROW_SEPARATOR_HEIGHT);
@@ -535,37 +585,8 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
     
     yPos += SECTION_PADDING;
     
-    // Don't draw filled background container - rows have their own white backgrounds
-    // Just draw the border around container
-    const sectionEndY = yPos;
-    const actualHeight = sectionEndY - sectionStartY;
-    
-    // Draw subtle border around container - matches header background color
-    doc.setDrawColor(...getLightColor(badgeColor));
-    doc.setLineWidth(0.2);
-    doc.roundedRect(margin - 3, sectionStartY, contentWidth + 6, actualHeight, containerBorderRadius, containerBorderRadius, 'S');
-    doc.setDrawColor(0, 0, 0);
-    
-    // Redraw header area content on top
-    // Colored background bar with solid light color (equivalent to 80% transparency)
-    doc.setFillColor(...getLightColor(badgeColor));
-    drawTopRoundedRect(margin - 3, sectionStartY, contentWidth + 6, colorBarHeight, containerBorderRadius);
-    
-    // Badge with 50% transparency
-    doc.setGState(new (doc as any).GState({ opacity: 0.5 }));
-    doc.setFillColor(...badgeColor);
-    doc.roundedRect(margin, badgeY, badgeWidth, badgeHeight, 1, 1, 'F');
-    doc.setGState(new (doc as any).GState({ opacity: 1.0 }));
-    doc.setFontSize(8);
-    doc.setFont('Inter', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text(String(issueList.length), margin + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 1, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    
-    // Title
-    doc.setFontSize(14);
-    doc.setFont('Inter', 'bold');
-    doc.text(title, margin + badgeWidth + 3, titleTextY);
+    // Close final page's section container (this is the last page)
+    closeSectionContainer(currentPageSectionStart, isFirstPageSegment, true);
   };
 
   // Add spacing before first table
