@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { invoke } from '@forge/bridge';
+import { invoke, router } from '@forge/bridge';
 import SprintReportPage from './components/SprintReportPage';
 import type { SprintReportData } from './types';
 import './index.css';
@@ -36,6 +36,11 @@ const App: React.FC = () => {
   // Panel state - new rail + drawer pattern
   const [hasGeneratedReport, setHasGeneratedReport] = useState(false);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+
+  // Feedback dropdown state
+  const [feedbackMenuOpen, setFeedbackMenuOpen] = useState(false);
+  // Briefly true after user copies the email address
+  const [feedbackCopied, setFeedbackCopied] = useState(false);
 
   // Load projects on mount
   useEffect(() => {
@@ -236,20 +241,22 @@ const App: React.FC = () => {
           </select>
         </div>      {/* Use Sprint Mode checkbox with helper text */}
       <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
           <input 
             type="checkbox"
-            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-            checked={useSprintMode}
-            onChange={(e) => setUseSprintMode(e.target.checked)}
+            style={{ width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0, marginTop: '2px' }}
+            checked={!useSprintMode}
+            onChange={(e) => setUseSprintMode(!e.target.checked)}
           />
-          <label style={{ fontSize: '14px', fontWeight: 400, color: textColor, margin: 0 }}>
-            Use sprint mode
-          </label>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 400, color: textColor }}>
+              Use custom dates
+            </div>
+            <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: helperColor }}>
+              When checked, you can specify custom date ranges instead of sprint boundaries.
+            </p>
+          </div>
         </div>
-        <p style={{ margin: '0 0 0 26px', fontSize: '12px', color: helperColor }}>
-          When unchecked, you can specify custom date ranges instead of sprint boundaries.
-        </p>
       </div>
 
       {/* Manual date range when Sprint Mode is off */}
@@ -315,15 +322,86 @@ const App: React.FC = () => {
       {/* Hero Section - Always visible */}
       <section className="sw-hero-section">
         <div className="sw-hero-inner">
-          {/* Header Card - Always visible */}
-          <div className="sw-card sw-header-card">
-            <h1 className="sw-header-title">
-              <img src="./SprintWeeklyLogo.png" alt="Sprint Weekly" className="sw-header-logo" />
-              Sprint Weekly
-            </h1>
-            <p className="sw-header-subtitle">
-              Create clear, client-ready sprint reports in seconds.
-            </p>
+          {/* Header App Bar - Always visible, compact app-bar style */}
+          <div className="sw-app-bar">
+            {/* Left: logo + branding text */}
+            <div className="sw-app-bar-brand">
+              <img src="./SprintWeeklyLogo.png" alt="Smart Sprints" className="sw-header-logo" />
+              <div>
+                <h1 className="sw-header-title">Smart Sprints</h1>
+                <p className="sw-header-subtitle">
+                  Spend less time reporting on the work you've done
+                </p>
+              </div>
+            </div>
+            {/* Right: feedback action – dropdown with mailto primary + copy-address fallback */}
+            <div className="sw-app-bar-actions">
+              {/* Transparent fullscreen backdrop closes the menu when clicking outside */}
+              {feedbackMenuOpen && (
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 199 }}
+                  onClick={() => setFeedbackMenuOpen(false)}
+                />
+              )}
+              <div style={{ position: 'relative', zIndex: 200 }}>
+                {/* Main trigger button – toggles the dropdown */}
+                <button
+                  className={`sw-feedback-btn${feedbackCopied ? ' sw-feedback-btn--copied' : ''}`}
+                  type="button"
+                  onClick={() => setFeedbackMenuOpen(o => !o)}
+                >
+                  {/* Speech bubble icon */}
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M14 1H2C1.4 1 1 1.4 1 2v9c0 .6.4 1 1 1h2v3l3.5-3H14c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                  </svg>
+                  {feedbackCopied ? 'Email copied!' : 'Send feedback'}
+                </button>
+                {/* Dropdown menu */}
+                {feedbackMenuOpen && (
+                  <div className="sw-feedback-menu">
+                    {/* Option 1: open default email client via mailto: */}
+                    <button
+                      className="sw-feedback-menu-item"
+                      type="button"
+                      onClick={() => {
+                        setFeedbackMenuOpen(false);
+                        router.open('mailto:support@datainsightlab.co?subject=Smart%20Sprints%20Feedback');
+                      }}
+                    >
+                      {/* Envelope icon */}
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M1.5 4.5L8 9.5L14.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                      </svg>
+                      Open email client
+                    </button>
+                    {/* Option 2: copy email address to clipboard for manual use */}
+                    <button
+                      className="sw-feedback-menu-item"
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('support@datainsightlab.co').then(() => {
+                          setFeedbackCopied(true);
+                          setFeedbackMenuOpen(false);
+                          // Reset the copied state after 2.5 seconds
+                          setTimeout(() => setFeedbackCopied(false), 2500);
+                        });
+                      }}
+                    >
+                      {/* Copy icon */}
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <rect x="5" y="1" width="9" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M3 4.5H2C1.4 4.5 1 4.9 1 5.5v8.5c0 .6.4 1 1 1h7.5c.6 0 1-.4 1-1V13" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                      </svg>
+                      <div>
+                        <div>Copy email address</div>
+                        <div className="sw-feedback-menu-email">support@datainsightlab.co</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Initial Customization Card - Only before report generation */}

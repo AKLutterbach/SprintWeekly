@@ -20,10 +20,34 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
   const [loading, setLoading] = React.useState(false);
 
   // Categorize issues correctly based on backend data structure
-  // complete = issues that were completed
-  // incomplete = issues that remain uncompleted
   const completeIssues = issues?.completed || [];
   const incompleteIssues = issues?.uncompleted || [];
+
+  // Split incomplete issues: those with 'progress' in status go to In Progress, rest to To Do
+  const inProgressIssues = incompleteIssues.filter((i: any) =>
+    i.status?.toLowerCase().includes('progress')
+  );
+  const toDoIssues = incompleteIssues.filter((i: any) =>
+    !i.status?.toLowerCase().includes('progress')
+  );
+
+  // Total issue count for the subtitle meta line
+  const totalIssueCount = completeIssues.length + incompleteIssues.length;
+
+  // Format an ISO date string as MM/DD/YY for the subtitle
+  const formatDate = (iso?: string): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${String(d.getFullYear()).slice(2)}`;
+  };
+
+  // Return the right CSS class for a status pill based on the status label
+  const getStatusPillClass = (status: string): string => {
+    const s = status.toLowerCase();
+    if (s.includes('done') || s.includes('complete')) return 'status-pill-complete';
+    if (s.includes('progress')) return 'status-pill-inprogress';
+    return 'status-pill-todo';
+  };
 
   /**
    * Opens the issue in a Jira modal dialog using ViewIssueModal from @forge/jira-bridge.
@@ -54,16 +78,21 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
     try {
       setLoading(true);
       
-      // Build the metrics object structure expected by the export resolver
-      const metrics = {
-        committedAtStart: overview.committed.breakdown.plannedAtStart,
-        committedCarryover: overview.committed.breakdown.fromLastSprint,
-        addedMidSprint: overview.committed.breakdown.addedMidSprint,
-        completed: overview.completed.total,
-        incompleteCarryover: overview.incomplete.total,
-        totalIssues: overview.committed.total,
-        committedIssues: overview.committed.total,
-        completedIssues: overview.completed.total
+      // Build the byStatus structure expected by the export resolver
+      // This structure directly maps the overview data to what the PDF renderer expects
+      const byStatus = {
+        committed: {
+          total: overview.committed.total,
+          breakdown: overview.committed.breakdown
+        },
+        complete: {
+          total: overview.completed.total,
+          breakdown: overview.completed.breakdown
+        },
+        incomplete: {
+          total: overview.incomplete.total,
+          breakdown: overview.incomplete.breakdown
+        }
       };
       
       // Call the export.report resolver with proper structure
@@ -73,7 +102,8 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
           requestId: `export-${Date.now()}`,
           generatedAt: new Date().toISOString(),
           scope: { type: 'sprint', id: data.sprintId?.toString() || '' },
-          metrics: metrics,
+          byStatus: byStatus,
+          metrics: {}, // Keep empty for backwards compatibility
           issues: issues || {
             completed: [],
             uncompleted: [],
@@ -81,9 +111,18 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
           }
         },
         sprintName: data.sprintName || '',
-        reportTitle: data.projectName ? `${data.projectName} Sprint Report` : 'Sprint Report',
+        reportTitle: data.projectName ? `${data.projectName}` : 'Sprint Report',
         startDate: data.startDate,
-        endDate: data.endDate
+        endDate: data.endDate,
+        // Send pre-formatted timestamp in the user's local timezone so the PDF footer is correct
+        generatedAt: new Date().toLocaleString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
       };
       
       const response: any = await invoke('export.report', exportRequest);
@@ -130,8 +169,28 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
       <div className="report-header">
         <div className="header-content">
           <div className="header-text">
-            <h1 className="report-title">{data.projectName ? `${data.projectName} Sprint Report` : 'Sprint Report'}</h1>
-            <p className="report-subtitle">{data.sprintName || ''}</p>
+            <h1 className="report-title">
+              {/* iOS-style bar chart icon — matches the PDF header icon */}
+              <span className="header-icon-wrap" aria-hidden="true">
+                <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="26" height="26" rx="6" fill="#EAEDF8"/>
+                  <rect x="5.5" y="14" width="4" height="7" rx="1" fill="#3A6BD6"/>
+                  <rect x="11" y="9" width="4" height="12" rx="1" fill="#3A6BD6"/>
+                  <rect x="16.5" y="11.5" width="4" height="9.5" rx="1" fill="#3A6BD6"/>
+                </svg>
+              </span>
+              {data.projectName || 'Sprint Report'}
+            </h1>
+            {/* Meta line: sprint name · date range · issue count, matching PDF subtitle */}
+            <p className="report-meta">
+              {[
+                data.sprintName,
+                (data.startDate && data.endDate)
+                  ? `${formatDate(data.startDate)} – ${formatDate(data.endDate)}`
+                  : null,
+                `${totalIssueCount} ${totalIssueCount === 1 ? 'issue' : 'issues'}`
+              ].filter(Boolean).join(' · ')}
+            </p>
           </div>
           <button className="export-pdf-button" onClick={handleExportPDF} disabled={loading}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -143,47 +202,23 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
         </div>
       </div>
 
-      <div className="metrics-container">
-        {/* Committed Card */}
-        <div className="metric-column">
-          <div className="metric-card metric-card-committed">
-            <div className="card-content">
-              <h2 className="card-title">Committed</h2>
-              <div className="card-value">{overview.committed.total}</div>
-              <p className="card-subtitle">Issues that were committed to this sprint</p>
-            </div>
-          </div>
-          
-          <div className="connector-line"></div>
-          
-          <div className="small-cards">
-            <div className="small-card">
-              <div className="small-card-value">{overview.committed.breakdown.fromLastSprint}</div>
-              <div className="small-card-label">From last sprint</div>
-            </div>
-            <div className="small-card">
-              <div className="small-card-value">{overview.committed.breakdown.plannedAtStart}</div>
-              <div className="small-card-label">Planned at start</div>
-            </div>
-            <div className="small-card">
-              <div className="small-card-value">{overview.committed.breakdown.addedMidSprint}</div>
-              <div className="small-card-label">Added mid-sprint</div>
-            </div>
-          </div>
-        </div>
+      {/* Sprint Overview heading + separator — matches PDF section heading */}
+      <div className="sprint-overview-section">
+        <h2 className="sprint-overview-title">Sprint Overview</h2>
+        <hr className="section-divider" />
+      </div>
 
+      <div className="metrics-container">
         {/* Complete Card */}
         <div className="metric-column">
           <div className="metric-card metric-card-complete">
+            <div className="metric-card-accent"></div>
             <div className="card-content">
               <h2 className="card-title">Complete</h2>
               <div className="card-value">{overview.completed.total}</div>
               <p className="card-subtitle">Issues finished by the end of the sprint</p>
             </div>
           </div>
-          
-          <div className="connector-line"></div>
-          
           <div className="small-cards">
             <div className="small-card">
               <div className="small-card-value">{overview.completed.breakdown.fromLastSprint}</div>
@@ -200,29 +235,53 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
           </div>
         </div>
 
-        {/* Incomplete Card */}
+        {/* In Progress Card — issues where status contains 'progress' */}
         <div className="metric-column">
-          <div className="metric-card metric-card-incomplete">
+          <div className="metric-card metric-card-inprogress">
+            <div className="metric-card-accent"></div>
             <div className="card-content">
-              <h2 className="card-title">Incomplete</h2>
-              <div className="card-value">{overview.incomplete.total}</div>
-              <p className="card-subtitle">Issues unfinished by the end of this sprint</p>
+              <h2 className="card-title">In Progress</h2>
+              <div className="card-value">{inProgressIssues.length}</div>
+              <p className="card-subtitle">Issues actively being worked on</p>
             </div>
           </div>
-          
-          <div className="connector-line"></div>
-          
           <div className="small-cards">
             <div className="small-card">
-              <div className="small-card-value">{overview.incomplete.breakdown.fromLastSprint}</div>
+              <div className="small-card-value">0</div>
               <div className="small-card-label">From last sprint</div>
             </div>
             <div className="small-card">
-              <div className="small-card-value">{overview.incomplete.breakdown.plannedAtStart}</div>
+              <div className="small-card-value">{inProgressIssues.length}</div>
               <div className="small-card-label">Planned at start</div>
             </div>
             <div className="small-card">
-              <div className="small-card-value">{overview.incomplete.breakdown.addedMidSprint}</div>
+              <div className="small-card-value">0</div>
+              <div className="small-card-label">Added mid-sprint</div>
+            </div>
+          </div>
+        </div>
+
+        {/* To Do Card — incomplete issues not currently in progress */}
+        <div className="metric-column">
+          <div className="metric-card metric-card-todo">
+            <div className="metric-card-accent"></div>
+            <div className="card-content">
+              <h2 className="card-title">To Do</h2>
+              <div className="card-value">{toDoIssues.length}</div>
+              <p className="card-subtitle">Issues not yet started</p>
+            </div>
+          </div>
+          <div className="small-cards">
+            <div className="small-card">
+              <div className="small-card-value">0</div>
+              <div className="small-card-label">From last sprint</div>
+            </div>
+            <div className="small-card">
+              <div className="small-card-value">{toDoIssues.length}</div>
+              <div className="small-card-label">Planned at start</div>
+            </div>
+            <div className="small-card">
+              <div className="small-card-value">0</div>
               <div className="small-card-label">Added mid-sprint</div>
             </div>
           </div>
@@ -231,91 +290,89 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
 
       {/* Sprint Status Detail Section */}
       <div className="status-detail-section">
-        <h2 className="status-detail-title">Sprint Status Detail</h2>
-        
-        {/* Complete Issues */}
-        {completeIssues.length > 0 && (
-          <div className="detail-card detail-card-complete">
-            <div className="detail-header">
-              <span className="detail-badge">{completeIssues.length}</span>
-              <h3 className="detail-title">Complete</h3>
-            </div>
-            <table className="detail-table">
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Summary</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {completeIssues.map((issue) => (
-                  <tr 
-                    key={issue.key}
-                    className="clickable-row"
-                    onClick={() => openIssueModal(issue.key)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <span className="detail-key">
-                        {issue.key}
-                      </span>
-                    </td>
-                    <td>{issue.summary}</td>
-                    <td>{issue.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Wrap heading + divider — negative margin-bottom pulls the first card up to 4px clearance */}
+        <div className="status-detail-header">
+          <h2 className="status-detail-title">Sprint Status Detail</h2>
+          <hr className="section-divider" />
+        </div>
 
-        {/* Incomplete Issues */}
-        {incompleteIssues.length > 0 ? (
-          <div className="detail-card detail-card-incomplete">
-            <div className="detail-header">
-              <span className="detail-badge">{incompleteIssues.length}</span>
-              <h3 className="detail-title">Incomplete</h3>
-            </div>
-            <table className="detail-table">
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Summary</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {incompleteIssues.map((issue) => (
-                  <tr 
-                    key={issue.key}
-                    className="clickable-row"
-                    onClick={() => openIssueModal(issue.key)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <span className="detail-key">
-                        {issue.key}
-                      </span>
-                    </td>
+        {/* Complete Issues Table — always shown */}
+        <div className="detail-card detail-card-complete">
+          <div className="detail-header">
+            <span className="detail-badge detail-badge-complete">{completeIssues.length}</span>
+            <h3 className="detail-title">Complete</h3>
+          </div>
+          <table className="detail-table">
+            <thead>
+              <tr><th>Key</th><th>Summary</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {completeIssues.length === 0 ? (
+                <tr><td colSpan={3} className="empty-category-cell">No issues in this category</td></tr>
+              ) : (
+                completeIssues.map((issue: any) => (
+                  <tr key={issue.key} className="clickable-row" onClick={() => openIssueModal(issue.key)}>
+                    <td><span className="detail-key">{issue.key}</span></td>
                     <td>{issue.summary}</td>
-                    <td>{issue.status}</td>
+                    <td><span className={`status-pill ${getStatusPillClass(issue.status || '')}`}>{issue.status}</span></td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* In Progress Issues Table — always shown */}
+        <div className="detail-card detail-card-inprogress">
+          <div className="detail-header">
+            <span className="detail-badge detail-badge-inprogress">{inProgressIssues.length}</span>
+            <h3 className="detail-title">In Progress</h3>
           </div>
-        ) : (
-          <div className="detail-card detail-card-incomplete">
-            <div className="detail-header">
-              <span className="detail-badge">0</span>
-              <h3 className="detail-title">Incomplete</h3>
-            </div>
-            <div className="empty-state">
-              <p style={{ fontStyle: 'italic', color: '#6b778c', padding: '24px', paddingLeft: '16px', textAlign: 'left' }}>No incomplete issues</p>
-            </div>
+          <table className="detail-table">
+            <thead>
+              <tr><th>Key</th><th>Summary</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {inProgressIssues.length === 0 ? (
+                <tr><td colSpan={3} className="empty-category-cell">No issues in this category</td></tr>
+              ) : (
+                inProgressIssues.map((issue: any) => (
+                  <tr key={issue.key} className="clickable-row" onClick={() => openIssueModal(issue.key)}>
+                    <td><span className="detail-key">{issue.key}</span></td>
+                    <td>{issue.summary}</td>
+                    <td><span className={`status-pill ${getStatusPillClass(issue.status || '')}`}>{issue.status}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* To Do Issues Table — always shown */}
+        <div className="detail-card detail-card-todo">
+          <div className="detail-header">
+            <span className="detail-badge detail-badge-todo">{toDoIssues.length}</span>
+            <h3 className="detail-title">To Do</h3>
           </div>
-        )}
+          <table className="detail-table">
+            <thead>
+              <tr><th>Key</th><th>Summary</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {toDoIssues.length === 0 ? (
+                <tr><td colSpan={3} className="empty-category-cell">No issues in this category</td></tr>
+              ) : (
+                toDoIssues.map((issue: any) => (
+                  <tr key={issue.key} className="clickable-row" onClick={() => openIssueModal(issue.key)}>
+                    <td><span className="detail-key">{issue.key}</span></td>
+                    <td>{issue.summary}</td>
+                    <td><span className={`status-pill ${getStatusPillClass(issue.status || '')}`}>{issue.status}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

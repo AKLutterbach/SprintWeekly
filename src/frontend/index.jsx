@@ -140,7 +140,7 @@ const App = () => {
       const sprintName = sprints.find(s => s.id === selectedSprint)?.name || selectedProject;
       const currentProjectName = projects.find(p => p.key === selectedProject)?.name || 'Project';
       const reportTitle = useSprintDates 
-        ? `${currentProjectName} Sprint Report`
+        ? `${currentProjectName}`
         : `${currentProjectName} Progress Report`;
       
       // Get date range for reporting period
@@ -404,7 +404,7 @@ const App = () => {
   
   // Determine report title based on date mode
   const reportTitle = useSprintDates 
-    ? `${currentProjectName} Sprint Report`
+    ? `${currentProjectName}`
     : `${currentProjectName} Progress Report`;
 
   return (

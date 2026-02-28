@@ -1,16 +1,16 @@
-/* Sprint Report Page - Styled to match PDF export */
+/* Sprint Report Page - Styled to match PDF export layout and visual design */
 
 .sprint-report-page {
   padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* ========== REPORT HEADER ========== */
+
 .report-header {
-  margin-bottom: 32px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 20px;
 }
 
 .header-content {
@@ -24,17 +24,31 @@
   flex: 1;
 }
 
+/* Title: icon + project name on one line */
 .report-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #172b4d;
-  margin: 0 0 8px 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e1e1e;
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.2;
 }
 
-.sprint-name {
-  font-size: 14px;
+/* iOS-style rounded-square icon wrapper */
+.header-icon-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Meta subtitle: Sprint 1 · 01/25/26 – 02/07/26 · 4 issues */
+.report-meta {
+  font-size: 13px;
   color: #6b778c;
   margin: 0;
+  line-height: 1.4;
 }
 
 .export-pdf-button {
@@ -53,84 +67,83 @@
   white-space: nowrap;
 }
 
-.export-pdf-button:hover {
-  background-color: #1a3a5c;
+.export-pdf-button:hover    { background-color: #1a3a5c; }
+.export-pdf-button:active   { background-color: #0a1d33; }
+.export-pdf-button:disabled { background-color: #6b778c; cursor: not-allowed; opacity: 0.6; }
+.export-pdf-button svg      { flex-shrink: 0; }
+
+/* ========== SECTION HEADINGS ========== */
+
+.sprint-overview-section {
+  margin-bottom: 16px;
 }
 
-.export-pdf-button:active {
-  background-color: #0a1d33;
+.sprint-overview-title,
+.status-detail-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e1e1e;
+  margin: 0 0 4px 0;
 }
 
-.export-pdf-button:disabled {
-  background-color: #6b778c;
-  cursor: not-allowed;
-  opacity: 0.6;
+.section-divider {
+  border: none;
+  border-top: 1px solid #d8d8dd;
+  margin: 0 0 16px 0;
 }
 
-.export-pdf-button svg {
-  flex-shrink: 0;
-}
+/* ========== METRICS CONTAINER ========== */
 
-/* Metrics Container - Three Columns */
 .metrics-container {
   display: flex;
-  gap: 24px;
+  gap: 16px;
   align-items: flex-start;
+  margin-bottom: 40px;
 }
 
 .metric-column {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
-/* Large Metric Cards - Matching PDF colors */
+/* Large Metric Cards — white with thin colored top accent strip */
 .metric-card {
-  background-color: rgb(245, 245, 245);
+  background-color: #ffffff;
+  border: 1px solid rgb(220, 220, 225);
   border-radius: 5px;
-  text-align: center;
-  height: 132px;
-  width: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 24px;
-  border-width: 5px;
-  border-style: solid;
 }
 
-/* Committed - Blue (#0052cc from Generate Report button) */
-.metric-card-committed {
-  border-color: rgba(0, 82, 204, 0.3);
-  background-color: rgba(217, 229, 246, 1);
+/* Thin accent strip at the very top of each card */
+.metric-card-accent {
+  height: 5px;
+  width: 100%;
+  flex-shrink: 0;
 }
 
-/* Complete - Light Green */
-.metric-card-complete {
-  border-color: rgba(209, 242, 211, 1);
-  background-color: rgba(237, 250, 238, 1);
-}
-
-/* Incomplete - Light Orange */
-.metric-card-incomplete {
-  border-color: rgba(255, 238, 201, 1);
-  background-color: rgba(255, 247, 230, 1);
-}
+.metric-card-complete   .metric-card-accent { background-color: rgb(76, 175, 80);   }
+.metric-card-inprogress .metric-card-accent { background-color: rgb(66, 133, 244);  }
+.metric-card-todo       .metric-card-accent { background-color: rgb(107, 119, 140); }
 
 .card-content {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  text-align: center;
 }
 
 .card-title {
   font-size: 11pt;
   font-weight: bold;
-  color: rgb(100, 100, 100);
+  color: rgb(80, 80, 80);
   margin: 0;
 }
 
@@ -150,15 +163,7 @@
   line-height: 1.3;
 }
 
-/* Connector Line */
-.connector-line {
-  width: 100%;
-  height: 0;
-  border-top: 1px solid #dcdcdc;
-  margin: 11px 0;
-}
-
-/* Small Cards Container */
+/* Small breakdown cards below each metric column */
 .small-cards {
   width: 100%;
   display: flex;
@@ -170,14 +175,14 @@
   background-color: white;
   border: 1px solid rgb(220, 220, 220);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 4px;
   flex: 1;
-  min-height: 70px;
+  min-height: 60px;
 }
 
 .small-card-value {
@@ -185,163 +190,103 @@
   font-weight: 600;
   color: rgb(0, 0, 0);
   text-align: center;
-  margin-top: 4px;
 }
 
 .small-card-label {
   font-size: 8pt;
   color: rgb(100, 100, 100);
   text-align: center;
+  line-height: 1.2;
+  /* Cap width so all three labels wrap to 2 lines, matching the PDF layout */
+  max-width: 68px;
+  margin: 0 auto;
 }
 
-/* Responsive Design */
-@media (max-width: 900px) {
-  .metrics-container {
-    flex-direction: column;
-  }
-  
-  .metric-column {
-    width: 100%;
-  }
-}
+/* ========== SPRINT STATUS DETAIL ========== */
 
-/* Sprint Status Detail Section */
 .status-detail-section {
-  margin-top: 48px;
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
-.status-detail-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #172b4d;
-  margin: 0 0 8px 0;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #e0e0e0;
+/* Pull the first card up so only ~4px sits below the divider,
+   while the 24px gap still applies between cards */
+.status-detail-header {
+  margin-bottom: -20px;
 }
 
-/* Detail Cards for each issue category */
+/* Detail card container */
 .detail-card {
   background-color: white;
-  border-radius: 5px;
-  padding: 0;
+  border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  border: 2px solid;
+  border: 1px solid rgb(220, 220, 225);
 }
 
-.detail-card-committed {
-  border-color: rgba(227, 242, 253, 1);
-}
-
-.detail-card-complete {
-  border-color: rgba(232, 245, 233, 1);
-}
-
-.detail-card-incomplete {
-  border-color: rgba(255, 243, 224, 1);
-}
-
-/* Detail Header with Badge and Title */
+/* Section header band — tinted per category */
 .detail-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  background-color: rgb(250, 250, 250);
+  gap: 10px;
+  padding: 12px 16px;
 }
 
-.detail-card-committed .detail-header {
-  background-color: rgb(227, 242, 253);
-}
+.detail-card-complete   .detail-header { background-color: rgba(76, 175, 80,   0.10); }
+.detail-card-inprogress .detail-header { background-color: rgba(66, 133, 244,  0.10); }
+.detail-card-todo       .detail-header { background-color: rgba(107, 119, 140, 0.10); }
 
-.detail-card-complete .detail-header {
-  background-color: rgb(232, 245, 233);
-}
-
-.detail-card-incomplete .detail-header {
-  background-color: rgb(255, 243, 224);
-}
-
-.detail-card-committed .detail-header {
-  background-color: rgb(227, 242, 253);
-}
-
-.detail-card-complete .detail-header {
-  background-color: rgb(232, 245, 233);
-}
-
-.detail-card-incomplete .detail-header {
-  background-color: rgb(255, 243, 224);
-}
-
+/* Count badge — fully rounded pill */
 .detail-badge {
-  background-color: rgb(180, 180, 180);
   color: white;
-  font-weight: 600;
-  font-size: 14px;
-  padding: 4px 12px;
-  border-radius: 8px;
-  min-width: 32px;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  min-width: 28px;
   text-align: center;
 }
 
-.detail-card-committed .detail-badge {
-  background-color: rgb(116, 197, 233);
-  color: white;
-}
-
-.detail-card-complete .detail-badge {
-  background-color: rgb(165, 214, 167);
-  color: white;
-}
-
-.detail-card-incomplete .detail-badge {
-  background-color: rgb(255, 204, 128);
-  color: white;
-}
+.detail-badge-complete   { background-color: rgb(76, 175, 80);   }
+.detail-badge-inprogress { background-color: rgb(66, 133, 244);  }
+.detail-badge-todo       { background-color: rgb(107, 119, 140); }
 
 .detail-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: #172b4d;
   margin: 0;
 }
 
-/* Issue Detail Table */
+/* Issue table */
 .detail-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .detail-table thead {
-  background-color: rgb(250, 250, 250);
-  border-top: 1px solid rgb(230, 230, 230);
+  background-color: rgb(244, 245, 247);
+  border-top: 1px solid rgb(225, 225, 230);
+  border-bottom: 1px solid rgb(210, 210, 215);
 }
 
 .detail-table thead th {
   text-align: left;
-  padding: 12px 20px;
+  padding: 10px 16px;
   font-weight: 600;
-  color: #6b778c;
-  font-size: 12px;
+  color: rgb(70, 70, 80);
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .detail-table tbody tr {
-  border-bottom: 1px solid rgb(240, 240, 240);
+  border-bottom: 1px solid rgb(235, 235, 240);
 }
 
 .detail-table tbody tr:last-child {
   border-bottom: none;
-}
-
-.detail-table tbody tr:hover {
-  background-color: rgb(250, 250, 250);
 }
 
 .detail-table tbody tr.clickable-row {
@@ -349,40 +294,60 @@
 }
 
 .detail-table tbody tr.clickable-row:hover {
-  background-color: rgb(235, 245, 255);
+  background-color: rgb(248, 249, 255);
 }
 
 .detail-table tbody td {
-  padding: 14px 20px;
+  padding: 12px 16px;
   color: #172b4d;
 }
 
+/* Issue key — indigo tint matching PDF */
 .detail-key {
   font-weight: 600;
-  color: #0052cc;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  color: rgb(80, 80, 180);
   font-size: 13px;
   cursor: pointer;
-  text-decoration: none;
 }
 
 .detail-key:hover {
-  color: #0065ff;
   text-decoration: underline;
+}
+
+/* Status pills — color-coded by status category */
+.status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-pill-complete   { background-color: rgba(76, 175, 80,   0.15); color: rgb(34, 110, 38);  }
+.status-pill-inprogress { background-color: rgba(66, 133, 244,  0.15); color: rgb(25, 70, 170);  }
+.status-pill-todo       { background-color: rgba(107, 119, 140, 0.15); color: rgb(55, 65, 85);   }
+
+/* Empty category row */
+.empty-category-cell {
+  padding: 12px 16px;
+  color: #6b778c;
+  font-style: italic;
+  font-size: 13px;
 }
 
 /* Column widths */
 .detail-table thead th:nth-child(1),
-.detail-table tbody td:nth-child(1) {
-  width: 15%;
-}
+.detail-table tbody td:nth-child(1) { width: 15%; }
 
 .detail-table thead th:nth-child(2),
-.detail-table tbody td:nth-child(2) {
-  width: 60%;
-}
+.detail-table tbody td:nth-child(2) { width: 60%; }
 
 .detail-table thead th:nth-child(3),
-.detail-table tbody td:nth-child(3) {
-  width: 25%;
+.detail-table tbody td:nth-child(3) { width: 25%; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .metrics-container { flex-direction: column; }
+  .metric-column     { width: 100%; }
 }

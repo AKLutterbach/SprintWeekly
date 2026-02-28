@@ -136,59 +136,33 @@ export async function buildReport(payload: unknown) {
   });
 
   // Transform metrics into the overview structure expected by frontend
+  // In sprint mode, all returned issues are part of the sprint (JQL filtered them)
+  // So we simply count the complete vs incomplete issues without date-based filtering
+  const totalIssuesInSprint = completedIssues.length + uncompletedIssues.length;
+  
   const byStatus = {
     committed: {
-      total: completedIssues.length + uncompletedIssues.length,
+      total: totalIssuesInSprint,
       breakdown: {
-        fromLastSprint: metrics.committedCarryover,
-        plannedAtStart: metrics.committedAtStart - metrics.addedMidSprint,
-        addedMidSprint: metrics.addedMidSprint
+        fromLastSprint: 0,  // Requires sprint history - not implemented yet
+        plannedAtStart: totalIssuesInSprint,  // All issues in sprint are considered planned
+        addedMidSprint: 0  // Requires tracking when issue was added to sprint - not implemented yet
       }
     },
     complete: {
       total: completedIssues.length,
       breakdown: {
-        fromLastSprint: completedIssues.filter(i => 
-          issues.find(issue => issue.key === i.key && 
-            (issue.fields as any).created && 
-            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
-          )
-        ).length,
-        plannedAtStart: completedIssues.filter(i => 
-          issues.find(issue => issue.key === i.key && 
-            (issue.fields as any).created && 
-            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
-          )
-        ).length,
-        addedMidSprint: completedIssues.filter(i => 
-          issues.find(issue => issue.key === i.key && 
-            (issue.fields as any).created && 
-            new Date((issue.fields as any).created) >= new Date((req.window as any)?.start || 0)
-          )
-        ).length
+        fromLastSprint: 0,  // Requires sprint history - not implemented yet
+        plannedAtStart: completedIssues.length,  // All completed issues counted as planned
+        addedMidSprint: 0  // Requires tracking when issue was added to sprint - not implemented yet
       }
     },
     incomplete: {
       total: uncompletedIssues.length,
       breakdown: {
-        fromLastSprint: uncompletedIssues.filter(i => 
-          issues.find(issue => issue.key === i.key && 
-            (issue.fields as any).created && 
-            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
-          )
-        ).length,
-        plannedAtStart: uncompletedIssues.filter(i => 
-          issues.find(issue => issue.key === i.key && 
-            (issue.fields as any).created && 
-            new Date((issue.fields as any).created) < new Date((req.window as any)?.start || 0)
-          )
-        ).length,
-        addedMidSprint: uncompletedIssues.filter(i => 
-          issues.find(issue => issue.key === i.key && 
-            (issue.fields as any).created && 
-            new Date((issue.fields as any).created) >= new Date((req.window as any)?.start || 0)
-          )
-        ).length
+        fromLastSprint: 0,  // Requires sprint history - not implemented yet
+        plannedAtStart: uncompletedIssues.length,  // All incomplete issues counted as planned
+        addedMidSprint: 0  // Requires tracking when issue was added to sprint - not implemented yet
       }
     }
   };
