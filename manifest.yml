@@ -26,7 +26,7 @@ modules:
       resource: sprint-report-ui
       resolver:
         function: resolver
-      title: Sprint Report
+      title: Smart Sprints
       layout: blank
       icon: resource:sprint-report-ui;smart-sprints-icon.png
 resources:

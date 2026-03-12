@@ -13,6 +13,8 @@ export interface SprintStatusOverviewData {
   committed: SprintStatusCategory;
   completed: SprintStatusCategory;
   incomplete: SprintStatusCategory;
+  inProgress?: SprintStatusCategory;
+  toDo?: SprintStatusCategory;
 }
 
 export interface IssueDetail {
@@ -32,6 +34,8 @@ export interface SprintReportData {
   issues?: {
     completed: IssueDetail[];
     uncompleted: IssueDetail[];
+    inProgress?: IssueDetail[];
+    toDo?: IssueDetail[];
     carryoverBlockers: IssueDetail[];
   };
 }

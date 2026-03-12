@@ -36,7 +36,7 @@ export async function buildReport(payload: unknown) {
   // make cache key
   const scopeRef = (req.scope as any).ref || (req.scope as any).id || JSON.stringify(req.scope);
   const sprintId = (req as any).sprintId;
-  const cacheKey = cache.makeCacheKey('report', scopeRef, sprintId || (req.window && (req.window as any).start) || '', JSON.stringify(req.metrics || []));
+  const cacheKey = cache.makeCacheKey('report_v3', scopeRef, sprintId || (req.window && (req.window as any).start) || '', JSON.stringify(req.metrics || []));
   try {
     const cached = await cache.getCache(cacheKey);
     if (cached) {
@@ -67,7 +67,7 @@ export async function buildReport(payload: unknown) {
 
   log.info('Final search JQL', { jql });
 
-  // Direct API call to bypass caching issues
+  // Fetch issues for the current sprint. customfield_10002 is story points.
   const searchResponse = await api.asUser().requestJira(
     route`/rest/api/3/search/jql?jql=${jql}&maxResults=100&fields=key,summary,status,assignee,customfield_10002,issuetype,labels,created`
   );
@@ -91,6 +91,101 @@ export async function buildReport(payload: unknown) {
       assignee: ri.fields?.assignee
     }
   }));
+
+  // Fetch sprint details now — we need originBoardId for carry-over detection
+  // and sprintStartDate for mid-sprint detection, both done below.
+  let sprintStartDate: string | undefined = (req.window as any)?.start;
+  let sprintEndDate: string | undefined = (req.window as any)?.end;
+  let sprintName: string | undefined = (payload as any).sprint?.name;
+  let sprintData: any = null;
+
+  if (useSprintMode && sprintId) {
+    try {
+      const sprintResponse = await api.asUser().requestJira(route`/rest/agile/1.0/sprint/${sprintId}`);
+      sprintData = await sprintResponse.json();
+      sprintName = sprintData.name || `Sprint ${sprintId}`;
+      sprintStartDate = sprintData.startDate || sprintStartDate;
+      sprintEndDate = sprintData.endDate || sprintEndDate;
+      log.info('Fetched sprint details', { sprintName, sprintStartDate, sprintEndDate, boardId: sprintData.originBoardId });
+    } catch (err) {
+      log.info('Failed to fetch sprint details, using defaults', { err });
+      sprintName = sprintName || `Sprint ${sprintId}`;
+    }
+  }
+
+  // Fetch project details to get the actual project name.
+  let projectName: string = projectKey;
+  try {
+    const projectResponse = await api.asApp().requestJira(route`/rest/api/3/project/${projectKey}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    const projectData = await projectResponse.json();
+    projectName = projectData.name || projectKey;
+  } catch (err) {
+    log.info('Failed to fetch project name, using key', { err });
+  }
+
+  // --- Carry-over detection via previous sprint query ---
+  //
+  // We find the most recently closed sprint on the same board, then ask Jira
+  // which of our current sprint's issues were ALSO in that previous sprint.
+  // This is far more reliable than reading customfield_10020, which only
+  // contains active sprint membership in most Jira configurations.
+  const currentSprintIdNum = sprintId ? parseInt(String(sprintId), 10) : null;
+  const carryOverKeys = new Set<string>();
+
+  if (useSprintMode && currentSprintIdNum && rawIssues.length > 0) {
+    try {
+      // originBoardId is available on the sprint object we already fetched above.
+      const boardId = (sprintData as any)?.originBoardId;
+
+      if (boardId) {
+        // Get the most recently closed sprints for this board.
+        const boardSprintsRes = await api.asUser().requestJira(
+          route`/rest/agile/1.0/board/${String(boardId)}/sprint?state=closed&maxResults=50`
+        );
+        const boardSprintsData = await boardSprintsRes.json();
+        const closedSprints: any[] = boardSprintsData.values || [];
+
+        // The previous sprint is the closed sprint with the highest ID that is
+        // still less than the current sprint ID.
+        const prevSprint = closedSprints
+          .filter((s: any) => s.id < currentSprintIdNum)
+          .sort((a: any, b: any) => b.id - a.id)[0];
+
+        if (prevSprint) {
+          log.info('Previous sprint found', { prevSprintId: prevSprint.id, prevSprintName: prevSprint.name });
+
+          // Build a comma-separated list of current issue keys to scope the JQL.
+          // NOTE: the JQL field name is "key" (not "issueKey").
+          const keyList = rawIssues.map((ri: any) => ri.key).join(',');
+          const prevJql = `sprint = ${prevSprint.id} AND key IN (${keyList})`;
+
+          const prevSprintRes = await api.asUser().requestJira(
+            route`/rest/api/3/search/jql?jql=${prevJql}&maxResults=100&fields=key`
+          );
+          const prevSprintData = await prevSprintRes.json();
+
+          for (const issue of (prevSprintData.issues || [])) {
+            if (issue.key) carryOverKeys.add(issue.key);
+          }
+
+          log.info('Carry-over detection via previous sprint query', {
+            prevSprintId: prevSprint.id,
+            carryOverCount: carryOverKeys.size,
+            carryOverKeys: Array.from(carryOverKeys)
+          });
+        } else {
+          log.info('No previous sprint found for board', { boardId, currentSprintId: currentSprintIdNum });
+        }
+      } else {
+        log.info('No originBoardId on sprint, skipping carry-over detection');
+      }
+    } catch (err) {
+      // Non-fatal: if previous sprint query fails, carry-over counts will show 0.
+      log.info('Carry-over detection failed, continuing without it', { err });
+    }
+  }
 
   // For now, no committedKeys from request payload; pass empty array.
   const metrics = computeMetrics(issues, { committedKeys: [], sprintStart: (req.window as any)?.start });
@@ -135,69 +230,104 @@ export async function buildReport(payload: unknown) {
     carryoverBlockers: carryoverBlockers.length
   });
 
-  // Transform metrics into the overview structure expected by frontend
-  // In sprint mode, all returned issues are part of the sprint (JQL filtered them)
-  // So we simply count the complete vs incomplete issues without date-based filtering
+  // Count carry-overs and mid-sprint additions within each status bucket.
+  //
+  // Origin precedence (mirrors computeMetrics.ts):
+  //   1. "fromLastSprint"  – was in any previous sprint (via customfield_10020)
+  //   2. "addedMidSprint"  – created AFTER sprint start AND NOT a carry-over
+  //   3. "plannedAtStart"  – everything else
+  //
+  // We need sprintStartDate (fetched above) to detect mid-sprint additions.
+  const sprintStartParsed = sprintStartDate ? new Date(sprintStartDate) : null;
+
+  // Build a Set of issue keys that were created after the sprint started and are
+  // not carry-overs.  We look at the full `issues` array which carries `fields.created`.
+  const midSprintKeys = new Set<string>();
+  if (sprintStartParsed) {
+    for (const issue of issues) {
+      const key = issue.key || '';
+      if (carryOverKeys.has(key)) continue; // carry-over takes precedence
+      const created = issue.fields.created;
+      if (created && new Date(created) > sprintStartParsed) {
+        midSprintKeys.add(key);
+      }
+    }
+    log.info('Mid-sprint detection', {
+      sprintStartDate,
+      midSprintCount: midSprintKeys.size,
+      midSprintKeys: Array.from(midSprintKeys)
+    });
+  }
+
+  const completedFromLastSprint = completedIssues.filter(i => i.key && carryOverKeys.has(i.key)).length;
+  const completedMidSprint      = completedIssues.filter(i => i.key && midSprintKeys.has(i.key)).length;
+
+  const incompleteFromLastSprint = uncompletedIssues.filter(i => i.key && carryOverKeys.has(i.key)).length;
+  const incompleteMidSprint      = uncompletedIssues.filter(i => i.key && midSprintKeys.has(i.key)).length;
+
+  // Further split uncompleted into "In Progress" vs "To Do" so the export
+  // renderer can show per-column sub-counts without proportional guessing.
+  const inProgressIssues = uncompletedIssues.filter(i =>
+    (i.status || '').toLowerCase().includes('progress')
+  );
+  const toDoIssues = uncompletedIssues.filter(i =>
+    !(i.status || '').toLowerCase().includes('progress')
+  );
+
+  const ipFromLastSprint = inProgressIssues.filter(i => i.key && carryOverKeys.has(i.key)).length;
+  const ipMidSprint      = inProgressIssues.filter(i => i.key && midSprintKeys.has(i.key)).length;
+  const tdFromLastSprint = toDoIssues.filter(i => i.key && carryOverKeys.has(i.key)).length;
+  const tdMidSprint      = toDoIssues.filter(i => i.key && midSprintKeys.has(i.key)).length;
+
+  const totalFromLastSprint = carryOverKeys.size;
+  const totalMidSprint      = midSprintKeys.size;
   const totalIssuesInSprint = completedIssues.length + uncompletedIssues.length;
-  
+
   const byStatus = {
     committed: {
-      total: totalIssuesInSprint,
+      // "committed" = in sprint at start = total minus those added mid-sprint
+      total: totalIssuesInSprint - totalMidSprint,
       breakdown: {
-        fromLastSprint: 0,  // Requires sprint history - not implemented yet
-        plannedAtStart: totalIssuesInSprint,  // All issues in sprint are considered planned
-        addedMidSprint: 0  // Requires tracking when issue was added to sprint - not implemented yet
+        fromLastSprint: totalFromLastSprint,
+        plannedAtStart: totalIssuesInSprint - totalMidSprint - totalFromLastSprint,
+        addedMidSprint: 0  // mid-sprint issues are not part of the committed count
       }
     },
     complete: {
       total: completedIssues.length,
       breakdown: {
-        fromLastSprint: 0,  // Requires sprint history - not implemented yet
-        plannedAtStart: completedIssues.length,  // All completed issues counted as planned
-        addedMidSprint: 0  // Requires tracking when issue was added to sprint - not implemented yet
+        fromLastSprint: completedFromLastSprint,
+        plannedAtStart: completedIssues.length - completedFromLastSprint - completedMidSprint,
+        addedMidSprint: completedMidSprint
       }
     },
     incomplete: {
       total: uncompletedIssues.length,
       breakdown: {
-        fromLastSprint: 0,  // Requires sprint history - not implemented yet
-        plannedAtStart: uncompletedIssues.length,  // All incomplete issues counted as planned
-        addedMidSprint: 0  // Requires tracking when issue was added to sprint - not implemented yet
+        fromLastSprint: incompleteFromLastSprint,
+        plannedAtStart: uncompletedIssues.length - incompleteFromLastSprint - incompleteMidSprint,
+        addedMidSprint: incompleteMidSprint
+      }
+    },
+    // Granular In Progress / To Do sub-counts so the export doesn't
+    // have to guess via proportional splitting.
+    inProgress: {
+      total: inProgressIssues.length,
+      breakdown: {
+        fromLastSprint: ipFromLastSprint,
+        plannedAtStart: inProgressIssues.length - ipFromLastSprint - ipMidSprint,
+        addedMidSprint: ipMidSprint
+      }
+    },
+    toDo: {
+      total: toDoIssues.length,
+      breakdown: {
+        fromLastSprint: tdFromLastSprint,
+        plannedAtStart: toDoIssues.length - tdFromLastSprint - tdMidSprint,
+        addedMidSprint: tdMidSprint
       }
     }
   };
-
-  // Fetch project details to get the actual project name
-  let projectName = projectKey;
-  try {
-    const projectResponse = await api.asApp().requestJira(route`/rest/api/3/project/${projectKey}`, {
-      headers: { 'Accept': 'application/json' }
-    });
-    const projectData = await projectResponse.json();
-    projectName = projectData.name || projectKey;
-  } catch (err) {
-    log.info('Failed to fetch project name, using key', { err });
-  }
-
-  // Get sprint details if in sprint mode
-  let sprintStartDate = (req.window as any)?.start;
-  let sprintEndDate = (req.window as any)?.end;
-  let sprintName = (payload as any).sprint?.name;
-  
-  if (useSprintMode && sprintId) {
-    // Fetch sprint details from Jira API
-    try {
-      const sprintResponse = await api.asUser().requestJira(route`/rest/agile/1.0/sprint/${sprintId}`);
-      const sprintData = await sprintResponse.json();
-      sprintName = sprintData.name || `Sprint ${sprintId}`;
-      sprintStartDate = sprintData.startDate || sprintStartDate;
-      sprintEndDate = sprintData.endDate || sprintEndDate;
-      log.info('Fetched sprint details', { sprintName, sprintStartDate, sprintEndDate });
-    } catch (err) {
-      log.info('Failed to fetch sprint details, using defaults', { err });
-      sprintName = sprintName || `Sprint ${sprintId}`;
-    }
-  }
 
   const reportPayload = {
     requestId,
@@ -208,6 +338,11 @@ export async function buildReport(payload: unknown) {
     issues: {
       completed: completedIssues,
       uncompleted: uncompletedIssues,
+      // Pre-split In Progress and To Do lists so consumers (frontend preview & PDF
+      // export) never need to independently re-filter issues.  This guarantees the
+      // detail tables always match the metric card totals from byStatus.
+      inProgress: inProgressIssues,
+      toDo: toDoIssues,
       carryoverBlockers: carryoverBlockers
     },
     sprintName: sprintName,

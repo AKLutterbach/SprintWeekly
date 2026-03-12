@@ -194,16 +194,30 @@ const App = () => {
     }
   };
 
-  // Load projects on mount
+  // Load projects on mount, pre-selecting the most recently edited project.
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         setLoadingProjects(true);
-        const response = await invoke('getProjects');
+
+        // Kick off both requests in parallel: the project list and the
+        // most-recently-updated project key for the current user.
+        const [response, recentResponse] = await Promise.all([
+          invoke('getProjects'),
+          invoke('getRecentProjectKey')
+        ]);
+
         if (response && response.projects) {
           setProjects(response.projects);
-          // Auto-select first project if available
-          if (response.projects.length > 0) {
+
+          const recentKey = recentResponse?.projectKey;
+          const matchesRecent = recentKey
+            ? response.projects.find(p => p.key === recentKey)
+            : null;
+
+          if (matchesRecent) {
+            setSelectedProject(matchesRecent.key);
+          } else if (response.projects.length > 0) {
             setSelectedProject(response.projects[0].key);
           }
         }

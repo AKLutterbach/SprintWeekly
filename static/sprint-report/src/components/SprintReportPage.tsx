@@ -19,17 +19,12 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
   const { overview, issues } = data;
   const [loading, setLoading] = React.useState(false);
 
-  // Categorize issues correctly based on backend data structure
+  // Use pre-categorised issue lists from the backend.  The backend is the single
+  // source of truth for ALL metric values — this component is a pure renderer.
   const completeIssues = issues?.completed || [];
   const incompleteIssues = issues?.uncompleted || [];
-
-  // Split incomplete issues: those with 'progress' in status go to In Progress, rest to To Do
-  const inProgressIssues = incompleteIssues.filter((i: any) =>
-    i.status?.toLowerCase().includes('progress')
-  );
-  const toDoIssues = incompleteIssues.filter((i: any) =>
-    !i.status?.toLowerCase().includes('progress')
-  );
+  const inProgressIssues = issues?.inProgress || [];
+  const toDoIssues = issues?.toDo || [];
 
   // Total issue count for the subtitle meta line
   const totalIssueCount = completeIssues.length + incompleteIssues.length;
@@ -92,7 +87,11 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
         incomplete: {
           total: overview.incomplete.total,
           breakdown: overview.incomplete.breakdown
-        }
+        },
+        // Pass granular In Progress / To Do sub-counts so the export
+        // renderer doesn't fall back to proportional splitting.
+        ...(overview.inProgress ? { inProgress: overview.inProgress } : {}),
+        ...(overview.toDo ? { toDo: overview.toDo } : {})
       };
       
       // Call the export.report resolver with proper structure
@@ -241,21 +240,21 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
             <div className="metric-card-accent"></div>
             <div className="card-content">
               <h2 className="card-title">In Progress</h2>
-              <div className="card-value">{inProgressIssues.length}</div>
+              <div className="card-value">{overview.inProgress?.total ?? inProgressIssues.length}</div>
               <p className="card-subtitle">Issues actively being worked on</p>
             </div>
           </div>
           <div className="small-cards">
             <div className="small-card">
-              <div className="small-card-value">0</div>
+              <div className="small-card-value">{overview.inProgress?.breakdown?.fromLastSprint ?? 0}</div>
               <div className="small-card-label">From last sprint</div>
             </div>
             <div className="small-card">
-              <div className="small-card-value">{inProgressIssues.length}</div>
+              <div className="small-card-value">{overview.inProgress?.breakdown?.plannedAtStart ?? 0}</div>
               <div className="small-card-label">Planned at start</div>
             </div>
             <div className="small-card">
-              <div className="small-card-value">0</div>
+              <div className="small-card-value">{overview.inProgress?.breakdown?.addedMidSprint ?? 0}</div>
               <div className="small-card-label">Added mid-sprint</div>
             </div>
           </div>
@@ -267,21 +266,21 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
             <div className="metric-card-accent"></div>
             <div className="card-content">
               <h2 className="card-title">To Do</h2>
-              <div className="card-value">{toDoIssues.length}</div>
+              <div className="card-value">{overview.toDo?.total ?? toDoIssues.length}</div>
               <p className="card-subtitle">Issues not yet started</p>
             </div>
           </div>
           <div className="small-cards">
             <div className="small-card">
-              <div className="small-card-value">0</div>
+              <div className="small-card-value">{overview.toDo?.breakdown?.fromLastSprint ?? 0}</div>
               <div className="small-card-label">From last sprint</div>
             </div>
             <div className="small-card">
-              <div className="small-card-value">{toDoIssues.length}</div>
+              <div className="small-card-value">{overview.toDo?.breakdown?.plannedAtStart ?? 0}</div>
               <div className="small-card-label">Planned at start</div>
             </div>
             <div className="small-card">
-              <div className="small-card-value">0</div>
+              <div className="small-card-value">{overview.toDo?.breakdown?.addedMidSprint ?? 0}</div>
               <div className="small-card-label">Added mid-sprint</div>
             </div>
           </div>

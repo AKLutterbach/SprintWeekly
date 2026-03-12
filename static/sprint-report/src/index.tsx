@@ -42,19 +42,37 @@ const App: React.FC = () => {
   // Briefly true after user copies the email address
   const [feedbackCopied, setFeedbackCopied] = useState(false);
 
-  // Load projects on mount
+  // Load projects on mount, pre-selecting the most recently edited project.
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         setLoadingProjects(true);
         setError(null);
-        const response: any = await invoke('getProjects');
-        if (response && response.projects) {
-          setProjects(response.projects);
-          if (response.projects.length > 0) {
-            setSelectedProject(response.projects[0].key);
+
+        // Kick off both requests in parallel: the project list and the
+        // most-recently-updated project key for the current user.
+        const [projectsResponse, recentResponse] = await Promise.all([
+          invoke('getProjects'),
+          invoke('getRecentProjectKey')
+        ]) as [any, any];
+
+        if (projectsResponse && projectsResponse.projects) {
+          setProjects(projectsResponse.projects);
+
+          // Pre-select the project the user touched most recently.
+          // Fall back to the first project in the list if the lookup fails
+          // or returns a project the user no longer has access to.
+          const recentKey = recentResponse?.projectKey;
+          const matchesRecent = recentKey
+            ? projectsResponse.projects.find((p: any) => p.key === recentKey)
+            : null;
+
+          if (matchesRecent) {
+            setSelectedProject(matchesRecent.key);
+          } else if (projectsResponse.projects.length > 0) {
+            setSelectedProject(projectsResponse.projects[0].key);
           }
-        } else if (response && response.error) {
+        } else if (projectsResponse && projectsResponse.error) {
           setError('Unable to load projects. Please refresh the page or contact your Jira admin if the problem persists.');
         }
       } catch (e: any) {
@@ -164,7 +182,9 @@ const App: React.FC = () => {
           overview: {
             committed: reportPayload.byStatus?.committed || { total: 0, breakdown: {} },
             completed: reportPayload.byStatus?.complete || { total: 0, breakdown: {} },
-            incomplete: reportPayload.byStatus?.incomplete || { total: 0, breakdown: {} }
+            incomplete: reportPayload.byStatus?.incomplete || { total: 0, breakdown: {} },
+            inProgress: reportPayload.byStatus?.inProgress || undefined,
+            toDo: reportPayload.byStatus?.toDo || undefined
           },
           issues: reportPayload.issues || { completed: [], uncompleted: [] },
           sprintName: reportPayload.sprintName || selectedSprintData?.name || 'Sprint',
@@ -330,7 +350,7 @@ const App: React.FC = () => {
               <div>
                 <h1 className="sw-header-title">Smart Sprints</h1>
                 <p className="sw-header-subtitle">
-                  Spend less time reporting on the work you've done
+                  Generate client-ready sprint reports in minutes
                 </p>
               </div>
             </div>

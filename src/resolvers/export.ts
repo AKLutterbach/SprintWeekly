@@ -20,6 +20,8 @@ interface ExportRequest {
     issues: {
       completed: any[];
       uncompleted: any[];
+      inProgress?: any[];
+      toDo?: any[];
       carryoverBlockers: any[];
     };
   };
@@ -28,17 +30,6 @@ interface ExportRequest {
   startDate?: string;
   endDate?: string;
   generatedAt?: string;  // Pre-formatted timestamp in the user's local timezone, sent from the frontend
-}
-
-/**
- * Format date from ISO string or YYYY-MM-DD to "Mon DD, YYYY" format
- */
-function formatDate(dateStr: string): string {
-  if (!dateStr) return '';
-  // Handle both ISO datetime strings (2025-11-11T03:39:27.522Z) and simple date strings (2025-11-11)
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return 'Invalid Date';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 /**
@@ -59,7 +50,7 @@ function formatDateShort(dateStr: string): string {
  * Creates a clean, client-ready PDF that mirrors the main report page layout
  */
 async function generatePDF(data: ExportRequest['reportData'], sprintName: string, reportTitle: string, startDate?: string, endDate?: string, generatedAt?: string): Promise<Buffer> {
-  const { metrics, byStatus, issues } = data;
+  const { byStatus, issues } = data;
   // Use the pre-formatted timestamp from the frontend (user's local timezone) if provided.
   // Fall back to server time (UTC) only if not supplied.
   if (!generatedAt) {
@@ -154,16 +145,12 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   const titleHeight = titleLines.length * 8.5;
   yPos += titleHeight;
 
-  // Compute status totals here so they can be used in both the subtitle line and the progress bar
-  const _completeTotal = byStatus?.complete?.total ?? (metrics.completed || 0);
-  const _inProgressIssues = issues.uncompleted.filter((i: any) =>
-    (i.status || i.fields?.status?.name || '').toLowerCase().includes('progress')
-  );
-  const _toDoIssues = issues.uncompleted.filter((i: any) =>
-    !(i.status || i.fields?.status?.name || '').toLowerCase().includes('progress')
-  );
-  const _inProgressTotal = _inProgressIssues.length + (issues.carryoverBlockers?.length || 0);
-  const _toDoTotal = _toDoIssues.length;
+  // All metric values come from byStatus (backend is single source of truth).
+  // No local issue filtering or proportional splitting — just render what the
+  // backend already computed.
+  const _completeTotal = byStatus?.complete?.total ?? 0;
+  const _inProgressTotal = byStatus?.inProgress?.total ?? 0;
+  const _toDoTotal = byStatus?.toDo?.total ?? 0;
   const _grandTotal = _completeTotal + _inProgressTotal + _toDoTotal;
 
   // Sprint name + date + total issues count: left-aligned to margin, muted
@@ -199,7 +186,7 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   yPos += 4;
 
   // Three-column layout with visual cards - using shared style configuration
-  const { layout, colors: cardColors, typography } = METRIC_CARD_STYLES;
+  const { layout, colors: cardColors } = METRIC_CARD_STYLES;
   const columnGap = layout.columnGap;
   const columnWidth = (contentWidth - (columnGap * 2)) / 3;
   const largeCardHeight = layout.largeCard.height;
@@ -218,69 +205,27 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   
   // Use light pastel colors for metric card borders (same as table header backgrounds)
   const lightComplete = getLightColor(cardColors.complete);
-  const lightIncomplete = getLightColor(cardColors.incomplete);
   // In Progress uses blue; To Do uses gray
   const lightInProgress: [number, number, number] = getLightColor([66, 133, 244]);
   const lightToDo: [number, number, number] = getLightColor([107, 119, 140]);
   
   // Helper function to draw a rounded rectangle card with optional colored border and background
-  const drawCard = (x: number, y: number, w: number, h: number, borderColor?: [number, number, number], isSmall: boolean = false, backgroundColor?: [number, number, number]) => {
-    // Use provided background color, or default to light gray for small cards
-    const [r, g, b] = backgroundColor || cardColors.cardBackground;
-    doc.setFillColor(r, g, b);
-    
-    const radius = isSmall ? smallCardRadius : cardRadius;
-    
-    // Set border color
-    if (borderColor) {
-      const [br, bg, bb] = borderColor;
-      doc.setDrawColor(br, bg, bb);
-      doc.setLineWidth(layout.largeCard.borderWidth);
-      doc.roundedRect(x, y, w, h, radius, radius, 'FD');
-    } else {
-      const [dbr, dbg, dbb] = cardColors.smallCardBorder;
-      doc.setDrawColor(dbr, dbg, dbb);
-      doc.setLineWidth(layout.smallCard.borderWidth);
-      doc.roundedRect(x, y, w, h, radius, radius, 'FD');
-    }
-  };
-
   // Starting Y position for cards
   const cardsY = yPos;
 
-  // === PROCESS EACH COLUMN ===
-  // Use byStatus if available (new structure), otherwise fall back to metrics (old structure)
-  const committedTotal = byStatus?.committed?.total ?? (metrics.committedAtStart || 0);
-  const completeTotal = byStatus?.complete?.total ?? (metrics.completed || 0);
-  const incompleteTotal = byStatus?.incomplete?.total ?? (metrics.incompleteCarryover || 0);
+  // === ALL METRIC VALUES FROM BACKEND (single source of truth) ===
+  // No local issue filtering or proportional splitting — byStatus contains
+  // exact totals and breakdowns computed by report.ts.
+  const completeTotal = byStatus?.complete?.total ?? 0;
+  const inProgressTotal = byStatus?.inProgress?.total ?? 0;
+  const toDoTotal = byStatus?.toDo?.total ?? 0;
 
-  // Split uncompleted issues into "In Progress" (status contains "progress") and "To Do" (everything else)
-  const inProgressIssues = issues.uncompleted.filter((i: any) =>
-    (i.status || i.fields?.status?.name || '').toLowerCase().includes('progress')
-  );
-  const toDoIssues = issues.uncompleted.filter((i: any) =>
-    !(i.status || i.fields?.status?.name || '').toLowerCase().includes('progress')
-  );
-  // carryoverBlockers are in-flight so count them with In Progress
-  const inProgressTotal = inProgressIssues.length + (issues.carryoverBlockers?.length || 0);
-  const toDoTotal = toDoIssues.length;
-
-  // Split the incomplete breakdown proportionally between In Progress and To Do
-  const splitTotal = inProgressTotal + toDoTotal;
-  const inProgressFraction = splitTotal > 0 ? inProgressTotal / splitTotal : 0;
-  const incompleteBreakdownValues = byStatus?.incomplete?.breakdown
-    ? [byStatus.incomplete.breakdown.fromLastSprint || 0, byStatus.incomplete.breakdown.plannedAtStart || 0, byStatus.incomplete.breakdown.addedMidSprint || 0]
-    : (() => {
-        const incTotal = metrics.incompleteCarryover || 0;
-        const committed = metrics.committedAtStart || 0;
-        return [
-          committed > 0 ? Math.round(incTotal * ((metrics.committedCarryover || 0) / committed)) : 0,
-          committed > 0 ? Math.round(incTotal * (Math.max(0, committed - (metrics.committedCarryover || 0) - (metrics.addedMidSprint || 0)) / committed)) : incTotal,
-          committed > 0 ? Math.round(incTotal * ((metrics.addedMidSprint || 0) / committed)) : 0
-        ];
-      })();
-  const ipBreakdown = incompleteBreakdownValues.map(v => Math.round(v * inProgressFraction));
-  const tdBreakdown = incompleteBreakdownValues.map((v, i) => v - ipBreakdown[i]);
+  // Helper to extract breakdown array from a byStatus category
+  const getBreakdown = (category: any) => [
+    { label: 'From last\nsprint', value: category?.breakdown?.fromLastSprint || 0 },
+    { label: 'Planned at\nstart', value: category?.breakdown?.plannedAtStart || 0 },
+    { label: 'Added mid-\nsprint', value: category?.breakdown?.addedMidSprint || 0 }
+  ];
   
   const columns = [
     {
@@ -290,47 +235,25 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
       subtitle: 'Issues finished by the end of this sprint',
       color: lightComplete,
       backgroundColor: cardColors.completeBackground,
-      breakdown: byStatus?.complete?.breakdown ? [
-        { label: 'From last\nsprint', value: byStatus.complete.breakdown.fromLastSprint || 0 },
-        { label: 'Planned at\nstart', value: byStatus.complete.breakdown.plannedAtStart || 0 },
-        { label: 'Added mid-\nsprint', value: byStatus.complete.breakdown.addedMidSprint || 0 }
-      ] : (() => {
-        const completedTotal = metrics.completed || 0;
-        const committedTotal = metrics.committedAtStart || 0;
-        return [
-          { label: 'From last\nsprint', value: committedTotal > 0 ? Math.round(completedTotal * ((metrics.committedCarryover || 0) / committedTotal)) : 0 },
-          { label: 'Planned at\nstart', value: committedTotal > 0 ? Math.round(completedTotal * (Math.max(0, committedTotal - (metrics.committedCarryover || 0) - (metrics.addedMidSprint || 0)) / committedTotal)) : completedTotal },
-          { label: 'Added mid-\nsprint', value: committedTotal > 0 ? Math.round(completedTotal * ((metrics.addedMidSprint || 0) / committedTotal)) : 0 }
-        ];
-      })()
+      breakdown: getBreakdown(byStatus?.complete)
     },
     {
-      // In Progress: uncompleted issues with "in progress" status + carryover blockers
       x: margin + columnWidth + columnGap,
       title: 'In Progress',
       value: inProgressTotal,
       subtitle: 'Issues actively being worked on',
       color: lightInProgress,
       backgroundColor: [232, 240, 254] as [number, number, number],
-      breakdown: [
-        { label: 'From last\nsprint', value: ipBreakdown[0] },
-        { label: 'Planned at\nstart', value: ipBreakdown[1] },
-        { label: 'Added mid-\nsprint', value: ipBreakdown[2] }
-      ]
+      breakdown: getBreakdown(byStatus?.inProgress)
     },
     {
-      // To Do: uncompleted issues that are not in progress
       x: margin + (columnWidth * 2) + (columnGap * 2),
       title: 'To Do',
       value: toDoTotal,
       subtitle: 'Issues not yet started',
       color: lightToDo,
       backgroundColor: [240, 242, 245] as [number, number, number],
-      breakdown: [
-        { label: 'From last\nsprint', value: tdBreakdown[0] },
-        { label: 'Planned at\nstart', value: tdBreakdown[1] },
-        { label: 'Added mid-\nsprint', value: tdBreakdown[2] }
-      ]
+      breakdown: getBreakdown(byStatus?.toDo)
     }
   ];
 
@@ -722,11 +645,19 @@ async function generatePDF(data: ExportRequest['reportData'], sprintName: string
   yPos += TABLE_SECTION_SPACING;
 
   // ========== IN PROGRESS ISSUES SECTION ==========
-  drawIssueTable('In Progress', inProgressIssues.concat(issues.carryoverBlockers || []), [66, 133, 244]); // Blue - in progress + carryover blockers
+  // Use pre-split issue lists from the backend (single source of truth) so the
+  // detail table always matches the metric card totals from byStatus.
+  const inProgressIssueList = issues.inProgress || issues.uncompleted.filter((i: any) =>
+    (i.status || i.fields?.status?.name || '').toLowerCase().includes('progress')
+  );
+  drawIssueTable('In Progress', inProgressIssueList, [66, 133, 244]); // Blue - in progress
   yPos += TABLE_SECTION_SPACING;
 
   // ========== TO DO ISSUES SECTION ==========
-  drawIssueTable('To Do', toDoIssues, [107, 119, 140]); // Gray - not yet started
+  const toDoIssueList = issues.toDo || issues.uncompleted.filter((i: any) =>
+    !(i.status || i.fields?.status?.name || '').toLowerCase().includes('progress')
+  );
+  drawIssueTable('To Do', toDoIssueList, [107, 119, 140]); // Gray - not yet started
 
   // ========== FOOTER ON ALL PAGES ==========
   const pageCount = doc.getNumberOfPages();

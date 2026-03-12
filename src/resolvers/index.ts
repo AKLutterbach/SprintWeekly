@@ -38,6 +38,30 @@ resolver.define('report.build', async (req) => {
   return result;
 });
 
+// Get the project key of the most recently updated issue for the current user.
+// This lets the app pre-select the project the user is most likely to report on.
+resolver.define('getRecentProjectKey', async () => {
+  try {
+    // Find the most recently updated issue where the current user is the assignee.
+    // This is a strong signal that the user was just working in that project.
+    const jql = 'assignee = currentUser() ORDER BY updated DESC';
+    const response = await api.asUser().requestJira(
+      route`/rest/api/3/search/jql?jql=${jql}&maxResults=1&fields=project`
+    );
+    const data = await response.json();
+
+    if (data?.issues?.length > 0) {
+      const project = data.issues[0].fields?.project;
+      return { projectKey: project?.key || null };
+    }
+
+    return { projectKey: null };
+  } catch (error: any) {
+    console.error('Error fetching recent project:', error);
+    return { projectKey: null };
+  }
+});
+
 // Get all projects accessible to the user
 resolver.define('getProjects', async () => {
   try {
