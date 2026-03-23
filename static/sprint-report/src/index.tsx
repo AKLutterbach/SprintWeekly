@@ -42,6 +42,156 @@ const App: React.FC = () => {
   // Briefly true after user copies the email address
   const [feedbackCopied, setFeedbackCopied] = useState(false);
 
+  // ─── Email Delivery State ────────────────────────────────────────────
+  const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
+  const [autoSendOnClose, setAutoSendOnClose] = useState(false);  const [companyName, setCompanyName] = useState('');  const [newEmailInput, setNewEmailInput] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [lastSentInfo, setLastSentInfo] = useState<any>(null);
+  const [emailConfigLoading, setEmailConfigLoading] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+
+  // ─── Load email config whenever the selected project changes ──────
+  useEffect(() => {
+    if (!selectedProject) return;
+    const loadEmailConfig = async () => {
+      setEmailConfigLoading(true);
+      try {
+        const [config, lastSent] = await Promise.all([
+          invoke('email.getRecipients', { projectKey: selectedProject }),
+          invoke('email.getLastSent', { projectKey: selectedProject }),
+        ]) as [any, any];
+        if (config) {
+          setEmailRecipients(config.emails || []);
+          setAutoSendOnClose(!!config.autoSendOnClose);
+          setCompanyName(config.companyName || '');
+        }
+        setLastSentInfo(lastSent || null);
+      } catch (err) {
+        console.error('Failed to load email config:', err);
+      } finally {
+        setEmailConfigLoading(false);
+      }
+    };
+    loadEmailConfig();
+  }, [selectedProject]);
+
+  // ─── Email helper functions ─────────────────────────────────────────
+  const addRecipient = () => {
+    const email = newEmailInput.trim().toLowerCase();
+    if (!email) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+    if (emailRecipients.includes(email)) {
+      setEmailError('This email is already in the list.');
+      return;
+    }
+    if (emailRecipients.length >= 8) {
+      setEmailError('Maximum 8 recipients allowed.');
+      return;
+    }
+    setEmailError(null);
+    const updated = [...emailRecipients, email];
+    setEmailRecipients(updated);
+    setNewEmailInput('');
+    saveEmailConfig(updated, autoSendOnClose, companyName);
+  };
+
+  const removeRecipient = (email: string) => {
+    const updated = emailRecipients.filter(e => e !== email);
+    setEmailRecipients(updated);
+    saveEmailConfig(updated, autoSendOnClose, companyName);
+  };
+
+  const toggleAutoSend = () => {
+    const newValue = !autoSendOnClose;
+    setAutoSendOnClose(newValue);
+    saveEmailConfig(emailRecipients, newValue, companyName);
+  };
+
+  const saveEmailConfig = async (emails: string[], autoSend: boolean, company: string) => {
+    if (!selectedProject) return;
+    setEmailSaving(true);
+    try {
+      await invoke('email.saveRecipients', {
+        projectKey: selectedProject,
+        emails,
+        autoSendOnClose: autoSend,
+        companyName: company,
+      });
+    } catch (err) {
+      console.error('Failed to save email config:', err);
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const handleSendReport = async () => {
+    if (!selectedProject || emailRecipients.length === 0) return;
+    setEmailSending(true);
+    setEmailError(null);
+    setEmailSuccess(null);
+    try {
+      const sprintObj = sprints.find(s => s.id === selectedSprint);
+      const result = await invoke('email.sendReport', {
+        projectKey: selectedProject,
+        sprintId: selectedSprint,
+        sprintName: sprintObj?.name || 'Sprint Report',
+        reportData: reportData ? {
+          requestId: `email-${Date.now()}`,
+          generatedAt: new Date().toISOString(),
+          scope: { type: 'project', id: selectedProject },
+          metrics: (reportData as any).metrics || {},
+          byStatus: (reportData as any).overview ? {
+            complete: (reportData as any).overview.complete,
+            inProgress: (reportData as any).overview.inProgress,
+            toDo: (reportData as any).overview.toDo,
+          } : {},
+          issues: reportData.issues || {},
+        } : undefined,
+        startDate: sprintObj?.startDate,
+        endDate: sprintObj?.endDate,
+      }) as any;
+      if (result?.success) {
+        setEmailSuccess(`Report sent to ${emailRecipients.length} recipient${emailRecipients.length > 1 ? 's' : ''}!`);
+        setLastSentInfo({ sentAt: new Date().toISOString(), sprintName: sprintObj?.name, recipientCount: emailRecipients.length });
+        setTimeout(() => setEmailSuccess(null), 5000);
+      } else {
+        setEmailError(result?.error || 'Failed to send email.');
+      }
+    } catch (err: any) {
+      setEmailError(err.message || 'Failed to send email.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    if (!selectedProject || emailRecipients.length === 0) return;
+    setEmailSending(true);
+    setEmailError(null);
+    setEmailSuccess(null);
+    try {
+      const result = await invoke('email.sendTest', {
+        projectKey: selectedProject,
+      }) as any;
+      if (result?.success) {
+        setEmailSuccess('Test email sent!');
+        setTimeout(() => setEmailSuccess(null), 5000);
+      } else {
+        setEmailError(result?.error || 'Failed to send test email.');
+      }
+    } catch (err: any) {
+      setEmailError(err.message || 'Failed to send test email.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   // Load projects on mount, pre-selecting the most recently edited project.
   useEffect(() => {
     const fetchProjects = async () => {
@@ -359,11 +509,11 @@ const App: React.FC = () => {
               {/* Transparent fullscreen backdrop closes the menu when clicking outside */}
               {feedbackMenuOpen && (
                 <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 199 }}
+                  style={{ position: 'fixed', inset: 0, zIndex: 79 }}
                   onClick={() => setFeedbackMenuOpen(false)}
                 />
               )}
-              <div style={{ position: 'relative', zIndex: 200 }}>
+              <div style={{ position: 'relative', zIndex: 80 }}>
                 {/* Main trigger button – toggles the dropdown */}
                 <button
                   className={`sw-feedback-btn${feedbackCopied ? ' sw-feedback-btn--copied' : ''}`}
@@ -459,7 +609,7 @@ const App: React.FC = () => {
               )}
               <div style={{ marginBottom: '16px' }}>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 600, color: '#172b4d' }}>
-                  Report customization
+                  Email Automation
                 </h3>
                 <p style={{ margin: '0', fontSize: '13px', color: '#6b778c' }}>
                   Select a project and sprint to generate your report.
@@ -515,7 +665,7 @@ const App: React.FC = () => {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="sw-rail-text">Customize report</span>
+                <span className="sw-rail-text">Email Automation</span>
               </div>
             </button>
           </div>
@@ -535,15 +685,194 @@ const App: React.FC = () => {
               </button>
               
               {/* Drawer Header */}
-              <div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 600, color: '#ffffff' }}>
-                  Report customization
+                  Email Automation
                 </h3>
                 <p style={{ margin: '0', fontSize: '13px', color: '#b3d4ff' }}>
-                  Select a project and sprint to generate your report.
+                  Configure your report and email delivery settings.
                 </p>
               </div>
-              {renderCustomizationControls(true)}
+
+              {/* ─── Section 1: Email Delivery ─── */}
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <div style={{ width: '3px', height: '16px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>Email Delivery</span>
+                </div>
+
+                {!selectedProject ? (
+                  <p style={{ fontSize: '13px', color: '#b3d4ff', fontStyle: 'italic' }}>
+                    Select a project above to configure email delivery.
+                  </p>
+                ) : emailConfigLoading ? (
+                  <p style={{ fontSize: '13px', color: '#b3d4ff' }}>Loading email settings...</p>
+                ) : (
+                  <>
+                    {/* Company name */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                        Company Name
+                      </label>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '11px', color: '#b3d4ff' }}>
+                        Shown in the email header. Leave blank to use the project name.
+                      </p>
+                      <input
+                        type="text"
+                        placeholder="e.g. Acme Corp"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        onBlur={() => saveEmailConfig(emailRecipients, autoSendOnClose, companyName)}
+                        style={{ width: '100%', padding: '7px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff', boxSizing: 'border-box' }}
+                      />
+                    </div>
+
+                    {/* Auto-send toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '10px 12px' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 400, color: '#ffffff' }}>Auto-send on sprint close</div>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#b3d4ff' }}>
+                          Automatically email the report when a sprint is completed.
+                        </p>
+                      </div>
+                      <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', flexShrink: 0, marginLeft: '12px' }}>
+                        <input
+                          type="checkbox"
+                          checked={autoSendOnClose}
+                          onChange={toggleAutoSend}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span style={{
+                          position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                          backgroundColor: autoSendOnClose ? '#36b37e' : '#5e6c84',
+                          borderRadius: '11px', transition: 'background-color 0.2s',
+                        }}>
+                          <span style={{
+                            position: 'absolute', height: '16px', width: '16px', left: autoSendOnClose ? '21px' : '3px', bottom: '3px',
+                            backgroundColor: '#ffffff', borderRadius: '50%', transition: 'left 0.2s',
+                          }} />
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Recipient list */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                        Recipients ({emailRecipients.length}/8)
+                      </label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="email"
+                          placeholder="email@example.com"
+                          value={newEmailInput}
+                          onChange={(e) => { setNewEmailInput(e.target.value); setEmailError(null); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(); } }}
+                          style={{ flex: 1, padding: '7px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff' }}
+                          disabled={emailRecipients.length >= 8}
+                        />
+                        <button
+                          onClick={addRecipient}
+                          disabled={emailRecipients.length >= 8 || !newEmailInput.trim()}
+                          style={{
+                            padding: '7px 14px', borderRadius: '4px', border: 'none',
+                            backgroundColor: emailRecipients.length >= 8 || !newEmailInput.trim() ? '#5e6c84' : '#ffffff',
+                            color: emailRecipients.length >= 8 || !newEmailInput.trim() ? '#172b4d' : '#0F2744',
+                            fontSize: '13px', fontWeight: 600, cursor: emailRecipients.length >= 8 || !newEmailInput.trim() ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Email chips */}
+                    {emailRecipients.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+                        {emailRecipients.map(email => (
+                          <span key={email} style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '4px',
+                            padding: '4px 10px', borderRadius: '12px',
+                            backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', fontSize: '12px',
+                          }}>
+                            {email}
+                            <button
+                              onClick={() => removeRecipient(email)}
+                              style={{ background: 'none', border: 'none', color: '#b3d4ff', cursor: 'pointer', padding: '0 0 0 2px', fontSize: '14px', lineHeight: 1 }}
+                              aria-label={`Remove ${email}`}
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Error / success messages */}
+                    {emailError && (
+                      <div style={{ fontSize: '12px', color: '#ff5630', marginBottom: '12px' }}>
+                        {emailError}
+                      </div>
+                    )}
+                    {emailSuccess && (
+                      <div style={{ fontSize: '12px', color: '#36b37e', marginBottom: '12px' }}>
+                        {emailSuccess}
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      <button
+                        onClick={handleSendTest}
+                        disabled={emailSending || emailRecipients.length === 0}
+                        style={{
+                          padding: '8px 14px', borderRadius: '4px', fontSize: '13px', fontWeight: 500,
+                          border: '1px solid rgba(255,255,255,0.3)', backgroundColor: 'transparent',
+                          color: emailSending || emailRecipients.length === 0 ? '#5e6c84' : '#ffffff',
+                          cursor: emailSending || emailRecipients.length === 0 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {emailSending ? 'Sending...' : 'Send Test Email'}
+                      </button>
+                      {hasGeneratedReport && (
+                        <button
+                          onClick={handleSendReport}
+                          disabled={emailSending || emailRecipients.length === 0}
+                          style={{
+                            padding: '8px 14px', borderRadius: '4px', fontSize: '13px', fontWeight: 600,
+                            border: 'none',
+                            backgroundColor: emailSending || emailRecipients.length === 0 ? '#5e6c84' : '#ffffff',
+                            color: emailSending || emailRecipients.length === 0 ? '#172b4d' : '#0F2744',
+                            cursor: emailSending || emailRecipients.length === 0 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {emailSending ? 'Sending...' : 'Send Report Now'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Last sent info */}
+                    {lastSentInfo?.sentAt && (
+                      <div style={{ marginTop: '12px', fontSize: '11px', color: '#b3d4ff' }}>
+                        Last sent: {new Date(lastSentInfo.sentAt).toLocaleString()} — {lastSentInfo.sprintName}
+                      </div>
+                    )}
+
+                    {/* Saving indicator */}
+                    {emailSaving && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#b3d4ff', fontStyle: 'italic' }}>Saving...</div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* ─── Section 2: Report Settings ─── */}
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <div style={{ width: '3px', height: '16px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>Report Settings</span>
+                </div>
+                {renderCustomizationControls(true)}
+              </div>
             </div>
           </div>
 

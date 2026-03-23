@@ -52,3 +52,7 @@ Thumbs.db
 /.forge/
 
 .forge-credentials
+
+# Secrets and credentials - never commit these
+sender secret.txt
+*.secret.txt

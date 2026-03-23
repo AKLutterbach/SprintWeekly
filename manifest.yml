@@ -13,6 +13,13 @@ modules:
   function:
     - key: resolver
       handler: resolvers/index.handler
+    - key: sprintClosedHandler
+      handler: resolvers/index.sprintClosedHandler
+  trigger:
+    - key: sprint-closed-email-trigger
+      function: sprintClosedHandler
+      events:
+        - avi:jira-software:closed:sprint
   jira:globalPage:
     - key: weekly-digest-global
       resource: sprint-report-ui
@@ -35,8 +42,14 @@ resources:
 
 permissions:
   scopes:
-    - read:jira-work              # Required for JQL search to fetch sprint issues
-    - read:issue:jira             # Required to read issue details (summary, status, assignee)
-    - read:project:jira           # Required to list and fetch project details
-    - read:issue-details:jira     # Required for custom field access (story points, labels)
-    - read:sprint:jira-software   # Required to fetch sprint details (name, dates)
+    - read:board-scope.admin:jira-software
+    - read:jira-work
+    - read:issue:jira
+    - read:project:jira
+    - read:issue-details:jira
+    - read:sprint:jira-software
+    - storage:app
+  external:
+    fetch:
+      backend:
+        - address: https://api.resend.com

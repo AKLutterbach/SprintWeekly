@@ -49,7 +49,7 @@ function formatDateShort(dateStr: string): string {
  * Generate PDF export of sprint report
  * Creates a clean, client-ready PDF that mirrors the main report page layout
  */
-async function generatePDF(data: ExportRequest['reportData'], sprintName: string, reportTitle: string, startDate?: string, endDate?: string, generatedAt?: string): Promise<Buffer> {
+export async function generatePDF(data: ExportRequest['reportData'], sprintName: string, reportTitle: string, startDate?: string, endDate?: string, generatedAt?: string): Promise<Buffer> {
   const { byStatus, issues } = data;
   // Use the pre-formatted timestamp from the frontend (user's local timezone) if provided.
   // Fall back to server time (UTC) only if not supplied.

@@ -4,6 +4,14 @@ import * as cache from '../lib/cache';
 import createForgeBackend from '../lib/cacheForgeBackend';
 import { buildReport } from './report';
 import { exportReport } from './export';
+import {
+  getEmailRecipients,
+  saveEmailRecipients,
+  sendReportEmail,
+  sendTestEmail,
+  getLastSentInfo,
+  onSprintClosed,
+} from './email';
 
 const resolver = new Resolver();
 
@@ -173,6 +181,45 @@ resolver.define('export.report', async (req) => {
   return await exportReport(payload);
 });
 
+// ─── Email Resolvers ─────────────────────────────────────────────────────────
+
+// Fetch email recipients + auto-send setting for a project
+resolver.define('email.getRecipients', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await getEmailRecipients(payload);
+});
+
+// Save email recipients + auto-send setting for a project
+resolver.define('email.saveRecipients', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await saveEmailRecipients(payload);
+});
+
+// Send the sprint report email to all recipients (manual trigger from UI)
+resolver.define('email.sendReport', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await sendReportEmail(payload);
+});
+
+// Send a test email to verify configuration
+resolver.define('email.sendTest', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await sendTestEmail(payload);
+});
+
+// Fetch the last-sent info for a project (timestamp, sprint name, etc.)
+resolver.define('email.getLastSent', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await getLastSentInfo(payload);
+});
+
 export const handler = resolver.getDefinitions();
+
+// ─── Sprint Closed Trigger Handler ───────────────────────────────────────────
+// Separate export for the product trigger module. Forge invokes this function
+// when a sprint is closed anywhere on the site.
+export const sprintClosedHandler = async (event: any) => {
+  await onSprintClosed(event);
+};
 
 export default handler;

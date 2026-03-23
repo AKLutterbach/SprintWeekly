@@ -33,7 +33,7 @@ body {
   width: 24px;
   height: 24px;
   border: 3px solid #dfe1e6;
-  border-top-color: #0F2744;
+  border-top-color: #1B3A4B;
   border-radius: 50%;
   animation: sw-spin 0.8s linear infinite;
 }
@@ -290,8 +290,8 @@ body {
   right: 0;
   width: 36px;
   height: auto;
-  background: #0F2744;
-  border: 1px solid #0F2744;
+  background: #1B3A4B;
+  border: 1px solid #1B3A4B;
   border-right: none;
   border-top-left-radius: 8px;
   border-bottom-left-radius: 8px;
@@ -356,7 +356,7 @@ body {
   right: 0;
   width: 395px;
   height: 100vh;
-  background: #0F2744;
+  background: #1B3A4B;
   box-shadow: -4px 0 16px rgba(9, 30, 66, 0.2);
   z-index: 100;
   overflow-y: auto;
