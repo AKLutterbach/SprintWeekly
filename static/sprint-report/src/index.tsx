@@ -52,6 +52,21 @@ const App: React.FC = () => {
   const [emailConfigLoading, setEmailConfigLoading] = useState(false);
   const [emailSaving, setEmailSaving] = useState(false);
 
+  // ─── Confluence Publishing State ─────────────────────────────────────
+  const [confluenceSpaces, setConfluenceSpaces] = useState<any[]>([]);
+  const [confluencePages, setConfluencePages] = useState<any[]>([]);
+  const [confluenceConfig, setConfluenceConfig] = useState<any>({
+    spaceId: '', spaceKey: '', spaceName: '',
+    parentPageId: '', parentPageTitle: '',
+    autoPublish: false,
+  });
+  const [confluenceConfigLoading, setConfluenceConfigLoading] = useState(false);
+  const [confluenceSaving, setConfluenceSaving] = useState(false);
+  const [confluencePublishing, setConfluencePublishing] = useState(false);
+  const [confluenceError, setConfluenceError] = useState<string | null>(null);
+  const [confluenceSuccess, setConfluenceSuccess] = useState<string | null>(null);
+  const [lastPublishedInfo, setLastPublishedInfo] = useState<any>(null);
+
   // ─── Load email config whenever the selected project changes ──────
   useEffect(() => {
     if (!selectedProject) return;
@@ -76,6 +91,143 @@ const App: React.FC = () => {
     };
     loadEmailConfig();
   }, [selectedProject]);
+
+  // ─── Load Confluence config + spaces whenever the selected project changes ──
+  useEffect(() => {
+    if (!selectedProject) return;
+    const loadConfluenceConfig = async () => {
+      setConfluenceConfigLoading(true);
+      try {
+        const [config, lastPublished, spacesResult] = await Promise.all([
+          invoke('confluence.getConfig', { projectKey: selectedProject }),
+          invoke('confluence.getLastPublished', { projectKey: selectedProject }),
+          invoke('confluence.listSpaces'),
+        ]) as [any, any, any];
+        if (config) {
+          setConfluenceConfig({
+            spaceId: config.spaceId || '',
+            spaceKey: config.spaceKey || '',
+            spaceName: config.spaceName || '',
+            parentPageId: config.parentPageId || '',
+            parentPageTitle: config.parentPageTitle || '',
+            autoPublish: !!config.autoPublish,
+          });
+          // If a space is already selected, load its pages for the parent picker
+          if (config.spaceId) {
+            const pagesResult = await invoke('confluence.listPages', { spaceId: config.spaceId }) as any;
+            setConfluencePages(pagesResult?.pages || []);
+          }
+        }
+        setLastPublishedInfo(lastPublished || null);
+        setConfluenceSpaces(spacesResult?.spaces || []);
+      } catch (err) {
+        console.error('Failed to load Confluence config:', err);
+      } finally {
+        setConfluenceConfigLoading(false);
+      }
+    };
+    loadConfluenceConfig();
+  }, [selectedProject]);
+
+  // ─── Confluence helper functions ────────────────────────────────────
+  const saveConfluenceSettings = async (overrides?: any) => {
+    if (!selectedProject) return;
+    setConfluenceSaving(true);
+    const merged = { ...confluenceConfig, ...overrides };
+    try {
+      await invoke('confluence.saveConfig', {
+        projectKey: selectedProject,
+        ...merged,
+      });
+      setConfluenceConfig(merged);
+    } catch (err) {
+      console.error('Failed to save Confluence config:', err);
+    } finally {
+      setConfluenceSaving(false);
+    }
+  };
+
+  const handleConfluenceSpaceChange = async (spaceId: string) => {
+    const space = confluenceSpaces.find((s: any) => s.id === spaceId);
+    const updates = {
+      spaceId,
+      spaceKey: space?.key || '',
+      spaceName: space?.name || '',
+      parentPageId: '',
+      parentPageTitle: '',
+    };
+    setConfluenceConfig((prev: any) => ({ ...prev, ...updates }));
+    // Load pages for the selected space
+    if (spaceId) {
+      try {
+        const result = await invoke('confluence.listPages', { spaceId }) as any;
+        setConfluencePages(result?.pages || []);
+      } catch {
+        setConfluencePages([]);
+      }
+    } else {
+      setConfluencePages([]);
+    }
+    await saveConfluenceSettings(updates);
+  };
+
+  const handleConfluenceParentChange = async (pageId: string) => {
+    const page = confluencePages.find((p: any) => p.id === pageId);
+    const updates = { parentPageId: pageId, parentPageTitle: page?.title || '' };
+    setConfluenceConfig((prev: any) => ({ ...prev, ...updates }));
+    await saveConfluenceSettings(updates);
+  };
+
+  const toggleAutoPublish = async () => {
+    const newVal = !confluenceConfig.autoPublish;
+    setConfluenceConfig((prev: any) => ({ ...prev, autoPublish: newVal }));
+    await saveConfluenceSettings({ autoPublish: newVal });
+  };
+
+  const handlePublishToConfluence = async () => {
+    if (!selectedProject || !confluenceConfig.spaceId) return;
+    setConfluencePublishing(true);
+    setConfluenceError(null);
+    setConfluenceSuccess(null);
+    try {
+      const sprintObj = sprints.find(s => s.id === selectedSprint);
+      const result = await invoke('confluence.publish', {
+        projectKey: selectedProject,
+        sprintId: selectedSprint,
+        sprintName: sprintObj?.name || 'Sprint Report',
+        reportData: reportData ? {
+          requestId: `confluence-${Date.now()}`,
+          generatedAt: new Date().toISOString(),
+          scope: { type: 'project', id: selectedProject },
+          metrics: (reportData as any).metrics || {},
+          byStatus: (reportData as any).overview ? {
+            complete: (reportData as any).overview.complete || (reportData as any).overview.completed,
+            inProgress: (reportData as any).overview.inProgress,
+            toDo: (reportData as any).overview.toDo,
+          } : {},
+          issues: reportData.issues || {},
+        } : undefined,
+        startDate: sprintObj?.startDate,
+        endDate: sprintObj?.endDate,
+      }) as any;
+      if (result?.success) {
+        setConfluenceSuccess('Published to Confluence!');
+        setLastPublishedInfo({
+          publishedAt: new Date().toISOString(),
+          sprintName: sprintObj?.name,
+          pageUrl: result.pageUrl,
+          pageId: result.pageId,
+        });
+        setTimeout(() => setConfluenceSuccess(null), 5000);
+      } else {
+        setConfluenceError(result?.error || 'Failed to publish.');
+      }
+    } catch (err: any) {
+      setConfluenceError(err.message || 'Failed to publish to Confluence.');
+    } finally {
+      setConfluencePublishing(false);
+    }
+  };
 
   // ─── Email helper functions ─────────────────────────────────────────
   const addRecipient = () => {
@@ -865,7 +1017,165 @@ const App: React.FC = () => {
                 )}
               </div>
 
-              {/* ─── Section 2: Report Settings ─── */}
+              {/* ─── Section 2: Confluence Publishing ─── */}
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <div style={{ width: '3px', height: '16px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>Confluence Publishing</span>
+                </div>
+
+                {!selectedProject ? (
+                  <p style={{ fontSize: '13px', color: '#b3d4ff', fontStyle: 'italic' }}>
+                    Select a project above to configure Confluence publishing.
+                  </p>
+                ) : confluenceConfigLoading ? (
+                  <p style={{ fontSize: '13px', color: '#b3d4ff' }}>Loading Confluence settings...</p>
+                ) : (
+                  <>
+                    {/* Space picker */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                        Confluence Space
+                      </label>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '11px', color: '#b3d4ff' }}>
+                        Reports will be published as pages in this space.
+                      </p>
+                      <select
+                        value={confluenceConfig.spaceId}
+                        onChange={(e) => handleConfluenceSpaceChange(e.target.value)}
+                        style={{
+                          width: '100%', padding: '7px 10px', borderRadius: '4px',
+                          border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px',
+                          backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <option value="" style={{ color: '#172b4d' }}>Select a space...</option>
+                        {confluenceSpaces.map((space: any) => (
+                          <option key={space.id} value={space.id} style={{ color: '#172b4d' }}>
+                            {space.name} ({space.key})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Parent page picker (only shown when a space is selected) */}
+                    {confluenceConfig.spaceId && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                          Parent Page <span style={{ fontWeight: 400, color: '#b3d4ff' }}>(optional)</span>
+                        </label>
+                        <p style={{ margin: '0 0 6px 0', fontSize: '11px', color: '#b3d4ff' }}>
+                          Reports will be nested under this page. Leave blank for top-level.
+                        </p>
+                        <select
+                          value={confluenceConfig.parentPageId}
+                          onChange={(e) => handleConfluenceParentChange(e.target.value)}
+                          style={{
+                            width: '100%', padding: '7px 10px', borderRadius: '4px',
+                            border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px',
+                            backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <option value="" style={{ color: '#172b4d' }}>Top level (no parent)</option>
+                          {confluencePages.map((page: any) => (
+                            <option key={page.id} value={page.id} style={{ color: '#172b4d' }}>
+                              {page.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Auto-publish toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '10px 12px' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 400, color: '#ffffff' }}>Auto-publish on sprint close</div>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#b3d4ff' }}>
+                          Automatically publish the report to Confluence when a sprint closes.
+                        </p>
+                      </div>
+                      <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', flexShrink: 0, marginLeft: '12px' }}>
+                        <input
+                          type="checkbox"
+                          checked={confluenceConfig.autoPublish}
+                          onChange={toggleAutoPublish}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span style={{
+                          position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                          backgroundColor: confluenceConfig.autoPublish ? '#36b37e' : '#5e6c84',
+                          borderRadius: '11px', transition: 'background-color 0.2s',
+                        }}>
+                          <span style={{
+                            position: 'absolute', height: '16px', width: '16px', left: confluenceConfig.autoPublish ? '21px' : '3px', bottom: '3px',
+                            backgroundColor: '#ffffff', borderRadius: '50%', transition: 'left 0.2s',
+                          }} />
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Error / success messages */}
+                    {confluenceError && (
+                      <div style={{ fontSize: '12px', color: '#ff5630', marginBottom: '12px' }}>
+                        {confluenceError}
+                      </div>
+                    )}
+                    {confluenceSuccess && (
+                      <div style={{ fontSize: '12px', color: '#36b37e', marginBottom: '12px' }}>
+                        {confluenceSuccess}
+                      </div>
+                    )}
+
+                    {/* Publish button */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      {hasGeneratedReport && (
+                        <button
+                          onClick={handlePublishToConfluence}
+                          disabled={confluencePublishing || !confluenceConfig.spaceId}
+                          style={{
+                            padding: '8px 14px', borderRadius: '4px', fontSize: '13px', fontWeight: 600,
+                            border: 'none',
+                            backgroundColor: confluencePublishing || !confluenceConfig.spaceId ? '#5e6c84' : '#ffffff',
+                            color: confluencePublishing || !confluenceConfig.spaceId ? '#172b4d' : '#0F2744',
+                            cursor: confluencePublishing || !confluenceConfig.spaceId ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {confluencePublishing ? 'Publishing...' : 'Publish to Confluence'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Last published info */}
+                    {lastPublishedInfo?.publishedAt && (
+                      <div style={{ marginTop: '12px', fontSize: '11px', color: '#b3d4ff' }}>
+                        Last published: {new Date(lastPublishedInfo.publishedAt).toLocaleString()} — {lastPublishedInfo.sprintName}
+                        {lastPublishedInfo.pageUrl && (
+                          <span>
+                            {' · '}
+                            <a
+                              href={lastPublishedInfo.pageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#579DFF', textDecoration: 'underline' }}
+                            >
+                              View page
+                            </a>
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Saving indicator */}
+                    {confluenceSaving && (
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#b3d4ff', fontStyle: 'italic' }}>Saving...</div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* ─── Section 3: Report Settings ─── */}
               <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <div style={{ width: '3px', height: '16px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />

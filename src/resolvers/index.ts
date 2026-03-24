@@ -12,6 +12,14 @@ import {
   getLastSentInfo,
   onSprintClosed,
 } from './email';
+import {
+  listConfluenceSpaces,
+  listConfluencePages,
+  getConfluenceConfig,
+  saveConfluenceConfig,
+  publishToConfluence,
+  getLastPublishedInfo,
+} from './confluence';
 
 const resolver = new Resolver();
 
@@ -211,6 +219,43 @@ resolver.define('email.sendTest', async (req) => {
 resolver.define('email.getLastSent', async (req) => {
   const payload = (req && req.payload) ? req.payload : req;
   return await getLastSentInfo(payload);
+});
+
+// ─── Confluence Resolvers ────────────────────────────────────────────────────
+
+// List Confluence spaces accessible to the current user
+resolver.define('confluence.listSpaces', async () => {
+  return await listConfluenceSpaces();
+});
+
+// List top-level pages in a Confluence space (for parent page picker)
+resolver.define('confluence.listPages', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await listConfluencePages(payload);
+});
+
+// Fetch saved Confluence publishing config for a project
+resolver.define('confluence.getConfig', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await getConfluenceConfig(payload);
+});
+
+// Save Confluence publishing config for a project
+resolver.define('confluence.saveConfig', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await saveConfluenceConfig(payload);
+});
+
+// Publish the sprint report to a Confluence page
+resolver.define('confluence.publish', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await publishToConfluence(payload);
+});
+
+// Fetch last-published metadata for a project
+resolver.define('confluence.getLastPublished', async (req) => {
+  const payload = (req && req.payload) ? req.payload : req;
+  return await getLastPublishedInfo(payload);
 });
 
 export const handler = resolver.getDefinitions();

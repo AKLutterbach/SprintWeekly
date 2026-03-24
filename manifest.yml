@@ -49,6 +49,12 @@ permissions:
     - read:issue-details:jira
     - read:sprint:jira-software
     - storage:app
+    - read:space:confluence
+    - read:page:confluence
+    - write:page:confluence
+    - write:attachment:confluence
+    - write:confluence-file
+    - write:confluence-content
   external:
     fetch:
       backend:
