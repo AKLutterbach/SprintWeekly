@@ -91,99 +91,83 @@ export function buildEmailTemplate(
       return v != null ? `${v}sp` : '–';
     };
 
-    // ── Sub-chip helper ─────────────────────────────────────────────────────
-    // Three small pill badges shown beneath each large card, matching the PDF
-    // breakdown sub-cards (from last sprint / planned at start / added mid-sprint).
-    const subChips = (fromLast: number, planned: number, added: number, textColor: string) =>
-      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
-        <tr>
-          <td style="text-align:center; padding:0 1px;">
-            <div style="font-size:13px; font-weight:700; color:${textColor};">${fromLast}</div>
-            <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.2;">From last<br/>sprint</div>
-          </td>
-          <td style="text-align:center; padding:0 1px;">
-            <div style="font-size:13px; font-weight:700; color:${textColor};">${planned}</div>
-            <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.2;">Planned<br/>at start</div>
-          </td>
-          <td style="text-align:center; padding:0 1px;">
-            <div style="font-size:13px; font-weight:700; color:${textColor};">${added}</div>
-            <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.2;">Added<br/>mid-sprint</div>
-          </td>
-        </tr>
-      </table>`;
+    // ── Sub-metric row helper ────────────────────────────────────────────────
+    // Renders the three breakdown values (from last sprint / planned at start /
+    // added mid-sprint) as a separate banded row inside the card so they are
+    // visually distinct from the large count above them.
+    const subRow = (fromLast: number, planned: number, added: number, bandBg: string, textColor: string) =>
+      `<tr>
+        <td style="background:${bandBg}; padding:8px 6px 10px 6px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="text-align:center; padding:0 2px; width:33%;">
+                <div style="font-size:14px; font-weight:700; color:${textColor};">${fromLast}</div>
+                <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.3; margin-top:2px;">From last<br/>sprint</div>
+              </td>
+              <td style="text-align:center; padding:0 2px; width:33%; border-left:1px solid rgba(0,0,0,0.06); border-right:1px solid rgba(0,0,0,0.06);">
+                <div style="font-size:14px; font-weight:700; color:${textColor};">${planned}</div>
+                <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.3; margin-top:2px;">Planned<br/>at start</div>
+              </td>
+              <td style="text-align:center; padding:0 2px; width:33%;">
+                <div style="font-size:14px; font-weight:700; color:${textColor};">${added}</div>
+                <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.3; margin-top:2px;">Added<br/>mid-sprint</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
 
     // ── Metric card helper ──────────────────────────────────────────────────
-    // Renders one coloured card with a large count, label, and 3 sub-chips.
+    // Each card has two visually distinct zones:
+    //   Top  — coloured background with the large count + status label
+    //   Band — slightly darker shade with the 3 breakdown sub-metrics
+    // The two zones are contained inside a rounded outer wrapper.
     const card = (
       count: number, label: string,
-      bg: string, color: string,
+      topBg: string, topColor: string, bandBg: string,
       fromLast: number, planned: number, added: number,
     ) =>
-      `<td valign="top" style="width:32%; padding:3px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      `<td valign="top" style="width:32%; padding:4px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:8px; overflow:hidden; border:1px solid rgba(0,0,0,0.06);">
           <tr>
-            <td style="background:${bg}; padding:16px 8px 14px 8px; text-align:center; border-radius:6px;">
-              <div style="font-size:28px; font-weight:700; color:${color}; line-height:1;">${count}</div>
-              <div style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; letter-spacing:0.6px; margin-top:4px;">${label}</div>
-              ${subChips(fromLast, planned, added, color)}
+            <td style="background:${topBg}; padding:18px 8px 14px 8px; text-align:center;">
+              <div style="font-size:30px; font-weight:700; color:${topColor}; line-height:1;">${count}</div>
+              <div style="font-size:10px; font-weight:700; color:${topColor}; text-transform:uppercase; letter-spacing:0.7px; margin-top:5px;">${label}</div>
             </td>
           </tr>
+          ${subRow(fromLast, planned, added, bandBg, topColor)}
         </table>
       </td>`;
 
     // Three cards matching the PDF Sprint Overview: Complete | In Progress | To Do
     const metricCards = `
       <tr>
-        <td style="padding: 24px 28px 0 28px;">
+        <td style="padding: 24px 24px 0 24px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
               ${card(
                 completeTotal,   'Complete',
-                '#e3fcef', '#006644',
+                '#e3fcef', '#006644', '#c8f5e0',
                 Number(completeBreak.fromLastSprint) || 0,
                 Number(completeBreak.plannedAtStart) || 0,
                 Number(completeBreak.addedMidSprint) || 0,
               )}
               ${card(
                 inProgressTotal, 'In Progress',
-                '#deebff', '#0747a6',
+                '#deebff', '#0747a6', '#c0d9ff',
                 Number(inProgressBreak.fromLastSprint) || 0,
                 Number(inProgressBreak.plannedAtStart) || 0,
                 Number(inProgressBreak.addedMidSprint) || 0,
               )}
               ${card(
                 toDoTotal,       'To Do',
-                '#f4f5f7', '#505f79',
+                '#f4f5f7', '#505f79', '#e4e5e9',
                 Number(toDoBreak.fromLastSprint) || 0,
                 Number(toDoBreak.plannedAtStart) || 0,
                 Number(toDoBreak.addedMidSprint) || 0,
               )}
             </tr>
           </table>
-        </td>
-      </tr>`;
-
-    // ── Status summary strip ────────────────────────────────────────────────
-    const dot = (c: string) =>
-      `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${c};vertical-align:middle;margin-right:3px;"></span>`;
-    const defectChip = defects > 0
-      ? ` &nbsp;&middot;&nbsp; ${dot('#de350b')}<strong style="color:#de350b;">${defects}</strong>&nbsp;Defects`
-      : '';
-    const carryoverChip = carryoverCount > 0
-      ? ` &nbsp;&middot;&nbsp; ${dot('#ff991f')}<strong style="color:#974f0c;">${carryoverCount}</strong>&nbsp;Carryover${blockedCount > 0 ? ` (${blockedCount} blocked)` : ''}`
-      : '';
-
-    const statusStrip = `
-      <tr>
-        <td style="padding: 12px 28px 0 28px;">
-          <div style="border-top:1px solid #ebecf0; padding-top:12px; font-size:12px; color:#42526e;">
-            ${dot('#36b37e')}<strong style="color:#006644;">${completeTotal}</strong>&nbsp;Complete
-            &nbsp;&middot;&nbsp;
-            ${dot('#0065ff')}<strong style="color:#0052cc;">${inProgressTotal}</strong>&nbsp;In Progress
-            &nbsp;&middot;&nbsp;
-            ${dot('#97a0af')}<strong style="color:#505f79;">${toDoTotal}</strong>&nbsp;To Do
-            ${carryoverChip}${defectChip}
-          </div>
         </td>
       </tr>`;
 
@@ -236,7 +220,7 @@ export function buildEmailTemplate(
         </td>
       </tr>`;
 
-    reportBodyRows = metricCards + statusStrip + completedRow + inProgressRow + toDoRow + carryoverRow + pdfNotice;
+    reportBodyRows = metricCards + completedRow + inProgressRow + toDoRow + carryoverRow + pdfNotice;
 
   } else {
     // Fallback when no report data is available — plain instructional text
@@ -308,7 +292,7 @@ export function buildEmailTemplate(
           <!-- Footer -->
           <tr>
             <td style="padding: 16px 32px 24px 32px;">
-              <div style="font-size: 12px; color: #97a0af; line-height: 1.5;">
+              <div style="font-size: 10px; color: #97a0af; line-height: 1.5;">
                 This report was generated by Smart Sprints. If you received this email in error, you can safely ignore it.
               </div>
             </td>
