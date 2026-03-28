@@ -176,12 +176,15 @@ export async function sendReportEmail(payload: any): Promise<any> {
     // Build the email HTML
     const projectName = await getProjectName(projectKey);
 
+    // Pass the full report data so the email body renders an inline visual
+    // summary — stakeholders see metrics + issues without opening the PDF
     const html = buildEmailTemplate(
       sprintName || 'Sprint Report',
       config.companyName,
       projectName,
       startDate,
       endDate,
+      data,
     );
 
     // Build a clean filename for the PDF attachment
@@ -280,10 +283,14 @@ export async function sendTestEmail(payload: any): Promise<any> {
     undefined
   );
 
+  // Pass the sample data so test emails also render the inline report layout
   const html = buildEmailTemplate(
     'Test Sprint',
     config.companyName,
     projectName,
+    undefined,
+    undefined,
+    sampleData,
   );
 
   return await sendEmail(
