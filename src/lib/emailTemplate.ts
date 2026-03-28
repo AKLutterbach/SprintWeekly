@@ -262,15 +262,15 @@ export function buildEmailTemplate(
 
           <!-- Header with brand color — shows the company name + sprint info -->
           <tr>
-            <td style="background-color: #0052cc; padding: 16px 32px;">
+            <td style="background-color: #0F2744; padding: 16px 32px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td>
                     <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;">
                       ${escapeHtml(headerTitle)}
                     </div>
-                    ${headerSubtitle ? `<div style="font-size: 13px; color: #b3d4ff; margin-top: 1px;">${headerSubtitle}</div>` : ''}
-                    <div style="font-size: 13px; color: #b3d4ff; margin-top: 4px;">
+                    ${headerSubtitle ? `<div style="font-size: 13px; color: #a8bfd8; margin-top: 1px;">${headerSubtitle}</div>` : ''}
+                    <div style="font-size: 13px; color: #a8bfd8; margin-top: 4px;">
                       ${subtitleHtml}
                     </div>
                   </td>
