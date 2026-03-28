@@ -70,74 +70,172 @@ export function buildConfluencePageBody(
 ): string {
   const { byStatus, issues } = data;
 
-  // Format dates nicely if available
+  // ── Date formatting ───────────────────────────────────────────────
   const fmtDate = (iso?: string) => {
     if (!iso) return '';
     const d = new Date(iso);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
-
   const dateRange = startDate && endDate
-    ? `${fmtDate(startDate)} &ndash; ${fmtDate(endDate)}`
+    ? `${fmtDate(startDate)} – ${fmtDate(endDate)}`
     : '';
 
-  // Helper to render a breakdown string like "(5 planned, 2 added, 1 carry-over)"
-  const breakdownStr = (b: StatusCategory['breakdown']) => {
+  // ── Breakdown label builder ───────────────────────────────────────
+  // Produces a compact breakdown string like "3 planned · 2 added · 1 carry-over"
+  const breakdownStr = (b: StatusCategory['breakdown']): string => {
     const parts: string[] = [];
     if (b.plannedAtStart > 0) parts.push(`${b.plannedAtStart} planned`);
-    if (b.addedMidSprint > 0) parts.push(`${b.addedMidSprint} added`);
-    if (b.fromLastSprint > 0) parts.push(`${b.fromLastSprint} carry-over`);
-    return parts.length > 0 ? `(${parts.join(', ')})` : '';
+    if (b.addedMidSprint > 0)  parts.push(`${b.addedMidSprint} added`);
+    if (b.fromLastSprint > 0)  parts.push(`${b.fromLastSprint} carry-over`);
+    return parts.join(' · ');
   };
 
-  // Helper to render an issue detail table
-  const issueTable = (title: string, items: IssueDetail[], accentColor: string) => {
-    if (items.length === 0) {
-      return `<h3>${escapeXml(title)}</h3><p><em>No issues</em></p>`;
+  // ── Confluence panel macro ────────────────────────────────────────
+  // Renders a color-accented panel card matching the app's metric card design.
+  // titleBGColor sets the header strip color; bgColor lightens the card body.
+  const metricPanel = (
+    label: string,
+    total: number,
+    breakdown: StatusCategory['breakdown'],
+    borderColor: string,
+    titleBGColor: string,
+    bgColor: string,
+  ): string => {
+    const breakStr = breakdownStr(breakdown);
+    return `<ac:structured-macro ac:name="panel" ac:schema-version="1">
+  <ac:parameter ac:name="borderColor">${borderColor}</ac:parameter>
+  <ac:parameter ac:name="borderStyle">solid</ac:parameter>
+  <ac:parameter ac:name="borderWidth">2</ac:parameter>
+  <ac:parameter ac:name="titleBGColor">${titleBGColor}</ac:parameter>
+  <ac:parameter ac:name="titleColor">#ffffff</ac:parameter>
+  <ac:parameter ac:name="bgColor">${bgColor}</ac:parameter>
+  <ac:parameter ac:name="title">${label}</ac:parameter>
+  <ac:rich-text-body>
+    <p style="text-align: center; margin: 8px 0 4px 0;"><strong style="font-size: 32px; line-height: 1;">${total}</strong></p>
+    <p style="text-align: center; color: #6b778c; font-size: 12px; margin: 0;">${breakStr || 'No issues'}</p>
+  </ac:rich-text-body>
+</ac:structured-macro>`;
+  };
+
+  // ── Status lozenge macro ──────────────────────────────────────────
+  // Maps Jira status labels to Confluence's built-in status macro colors.
+  const statusLozenge = (statusText: string): string => {
+    const s = statusText.toLowerCase();
+    let colour = 'Grey';
+    if (s.includes('done') || s.includes('complete') || s.includes('closed') || s.includes('resolved')) {
+      colour = 'Green';
+    } else if (s.includes('progress') || s.includes('review') || s.includes('active')) {
+      colour = 'Blue';
+    } else if (s.includes('block')) {
+      colour = 'Red';
     }
-    const rows = items.map(i =>
-      `<tr><td><strong>${escapeXml(i.key)}</strong></td><td>${escapeXml(i.summary)}</td><td>${escapeXml(i.status)}</td></tr>`
-    ).join('\n');
-
-    return `
-<h3><span style="color: ${accentColor};">${escapeXml(title)}</span></h3>
-<table>
-<tbody>
-<tr><th>Key</th><th>Summary</th><th>Status</th></tr>
-${rows}
-</tbody>
-</table>`;
+    return `<ac:structured-macro ac:name="status" ac:schema-version="1">
+  <ac:parameter ac:name="colour">${colour}</ac:parameter>
+  <ac:parameter ac:name="title">${escapeXml(statusText)}</ac:parameter>
+</ac:structured-macro>`;
   };
 
-  // Compose the full page body
-  return `
-<p><strong>${escapeXml(projectName || sprintName)}</strong>${dateRange ? ` &middot; ${dateRange}` : ''}</p>
+  // ── Issue detail panel ────────────────────────────────────────────
+  // Each category gets a panel with a colored border and an issue table inside.
+  const issuePanel = (
+    label: string,
+    items: IssueDetail[],
+    borderColor: string,
+    titleBGColor: string,
+  ): string => {
+    const count = items.length;
+    const bodyContent = count === 0
+      ? `<p style="color: #6b778c; font-style: italic;">No issues in this category.</p>`
+      : `<table>
+  <tbody>
+    <tr>
+      <th style="width: 100px;">Key</th>
+      <th>Summary</th>
+      <th style="width: 130px;">Status</th>
+    </tr>
+    ${items.map(i => `<tr>
+      <td><strong>${escapeXml(i.key)}</strong></td>
+      <td>${escapeXml(i.summary)}</td>
+      <td>${statusLozenge(i.status)}</td>
+    </tr>`).join('\n    ')}
+  </tbody>
+</table>`;
+
+    return `<ac:structured-macro ac:name="panel" ac:schema-version="1">
+  <ac:parameter ac:name="borderColor">${borderColor}</ac:parameter>
+  <ac:parameter ac:name="borderStyle">solid</ac:parameter>
+  <ac:parameter ac:name="borderWidth">2</ac:parameter>
+  <ac:parameter ac:name="titleBGColor">${titleBGColor}</ac:parameter>
+  <ac:parameter ac:name="titleColor">#ffffff</ac:parameter>
+  <ac:parameter ac:name="title">${label} (${count})</ac:parameter>
+  <ac:rich-text-body>
+    ${bodyContent}
+  </ac:rich-text-body>
+</ac:structured-macro>`;
+  };
+
+  // ── Page header info panel ────────────────────────────────────────
+  // Dark blue branded header with sprint name, project, and date range.
+  const generatedAt = new Date().toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+  // Second line: date range + generated timestamp, slightly smaller/muted
+  const headerSubtitle = [
+    dateRange ? `📅 ${dateRange}` : '',
+    `Generated ${generatedAt} by Smart Sprints for Jira`,
+  ].filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+
+  const headerPanel = `<ac:structured-macro ac:name="panel" ac:schema-version="1">
+  <ac:parameter ac:name="borderColor">#0F2744</ac:parameter>
+  <ac:parameter ac:name="borderStyle">solid</ac:parameter>
+  <ac:parameter ac:name="borderWidth">2</ac:parameter>
+  <ac:parameter ac:name="titleBGColor">#0F2744</ac:parameter>
+  <ac:parameter ac:name="titleColor">#ffffff</ac:parameter>
+  <ac:parameter ac:name="bgColor">#f4f7fb</ac:parameter>
+  <ac:parameter ac:name="title">📊 ${escapeXml(sprintName)}${projectName ? ` — ${escapeXml(projectName)}` : ''}</ac:parameter>
+  <ac:rich-text-body>
+    <p style="margin: 0; font-size: 12px; color: #6b778c;">${headerSubtitle}</p>
+  </ac:rich-text-body>
+</ac:structured-macro>`;
+
+  // ── Three-column metrics layout ───────────────────────────────────
+  // Confluence's section + column macros create a multi-column layout.
+  const metricsColumns = `<ac:structured-macro ac:name="section" ac:schema-version="1">
+  <ac:rich-text-body>
+    <ac:structured-macro ac:name="column" ac:schema-version="1">
+      <ac:parameter ac:name="width">33%</ac:parameter>
+      <ac:rich-text-body>
+        ${metricPanel('✓  Complete', byStatus.complete.total, byStatus.complete.breakdown, '#36B37E', '#36B37E', '#f0fcf6')}
+      </ac:rich-text-body>
+    </ac:structured-macro>
+    <ac:structured-macro ac:name="column" ac:schema-version="1">
+      <ac:parameter ac:name="width">33%</ac:parameter>
+      <ac:rich-text-body>
+        ${metricPanel('⟳  In Progress', byStatus.inProgress.total, byStatus.inProgress.breakdown, '#0065FF', '#0065FF', '#f0f5ff')}
+      </ac:rich-text-body>
+    </ac:structured-macro>
+    <ac:structured-macro ac:name="column" ac:schema-version="1">
+      <ac:parameter ac:name="width">34%</ac:parameter>
+      <ac:rich-text-body>
+        ${metricPanel('○  To Do', byStatus.toDo.total, byStatus.toDo.breakdown, '#6B778C', '#6B778C', '#f7f8f9')}
+      </ac:rich-text-body>
+    </ac:structured-macro>
+  </ac:rich-text-body>
+</ac:structured-macro>`;
+
+  // ── Compose full page ─────────────────────────────────────────────
+  return `${headerPanel}
 
 <h2>Sprint Overview</h2>
-<table>
-<tbody>
-<tr>
-<th style="text-align: center;">Complete</th>
-<th style="text-align: center;">In Progress</th>
-<th style="text-align: center;">To Do</th>
-</tr>
-<tr>
-<td style="text-align: center;"><strong>${byStatus.complete.total}</strong> ${breakdownStr(byStatus.complete.breakdown)}</td>
-<td style="text-align: center;"><strong>${byStatus.inProgress.total}</strong> ${breakdownStr(byStatus.inProgress.breakdown)}</td>
-<td style="text-align: center;"><strong>${byStatus.toDo.total}</strong> ${breakdownStr(byStatus.toDo.breakdown)}</td>
-</tr>
-</tbody>
-</table>
+${metricsColumns}
 
-<hr />
+<h2>Sprint Detail</h2>
+${issuePanel('✓  Completed Issues', issues.completed, '#36B37E', '#36B37E')}
 
-${issueTable('Completed Issues', issues.completed, '#36B37E')}
-${issueTable('In Progress Issues', issues.inProgress, '#0065FF')}
-${issueTable('To Do Issues', issues.toDo, '#6B778C')}
+${issuePanel('⟳  In Progress', issues.inProgress, '#0065FF', '#0065FF')}
 
-<hr />
-<p><em>Generated ${new Date().toLocaleString()} by Smart Sprints for Jira</em></p>
-`.trim();
+${issuePanel('○  To Do', issues.toDo, '#6B778C', '#6B778C')}`.trim();
 }
 
 // ─── Confluence REST Helpers ─────────────────────────────────────────────────
@@ -147,29 +245,18 @@ ${issueTable('To Do Issues', issues.toDo, '#6B778C')}
  * Returns an array of { id, key, name } objects.
  */
 export async function listSpaces(): Promise<{ id: string; key: string; name: string }[]> {
-  const spaces: { id: string; key: string; name: string }[] = [];
-  let cursor: string | null = null;
-
-  // Paginate through all spaces (max 250 per page)
-  do {
-    const url = cursor
-      ? `/wiki/api/v2/spaces?limit=250&cursor=${cursor}`
-      : '/wiki/api/v2/spaces?limit=250';
-
-    const response = await api.asUser().requestConfluence(route`${url}`);
-    if (!response.ok) {
-      console.error('Failed to list Confluence spaces:', response.status, await response.text());
-      break;
-    }
-    const data = await response.json();
-    for (const s of (data.results || [])) {
-      spaces.push({ id: s.id, key: s.key, name: s.name });
-    }
-    // Extract cursor from _links.next if present
-    cursor = data._links?.next ? new URL(data._links.next, 'https://x').searchParams.get('cursor') : null;
-  } while (cursor);
-
-  return spaces;
+  // A single-customer site won't exceed 250 spaces, so one request is sufficient.
+  // NOTE: We must use a fully static route template — Forge's `route` tag escapes any
+  // dynamic values inserted via ${}, which would break a dynamically-constructed URL path.
+  const response = await api.asUser().requestConfluence(
+    route`/wiki/api/v2/spaces?limit=250&status=current`
+  );
+  if (!response.ok) {
+    console.error('Failed to list Confluence spaces:', response.status, await response.text());
+    return [];
+  }
+  const data = await response.json();
+  return (data.results || []).map((s: any) => ({ id: s.id, key: s.key, name: s.name }));
 }
 
 /**
@@ -205,23 +292,49 @@ export async function createPage(
   body: string,
   parentId?: string,
 ): Promise<{ id: string; link: string }> {
-  const payload: any = {
-    spaceId,
-    status: 'current',
-    title,
-    body: { representation: 'storage', value: body },
-  };
-  if (parentId) payload.parentId = parentId;
+  // Inner helper so we can retry with a different title without duplicating logic.
+  const attemptCreate = async (pageTitle: string) => {
+    const payload: any = {
+      spaceId,
+      status: 'current',
+      title: pageTitle,
+      body: { representation: 'storage', value: body },
+    };
+    if (parentId) payload.parentId = parentId;
 
-  const response = await api.asUser().requestConfluence(route`/wiki/api/v2/pages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
+    return api.asUser().requestConfluence(route`/wiki/api/v2/pages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  };
+
+  let response = await attemptCreate(title);
+
+  // If Confluence rejects with 400 due to a duplicate title, append the current
+  // date/time to make the title unique and try once more.
+  if (!response.ok && response.status === 400) {
+    const txt = await response.text();
+    if (txt.includes('same TITLE') || txt.includes('title already exists') || txt.includes('BAD_REQUEST')) {
+      const timestamp = new Date().toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+      const fallbackTitle = `${title} (${timestamp})`;
+      console.warn(`Confluence title conflict — retrying with: "${fallbackTitle}"`);
+      response = await attemptCreate(fallbackTitle);
+      if (!response.ok) {
+        const retryTxt = await response.text();
+        throw new Error(`Failed to create Confluence page (${response.status}): ${retryTxt}`);
+      }
+    } else {
+      throw new Error(`Failed to create Confluence page (${response.status}): ${txt}`);
+    }
+  } else if (!response.ok) {
     const txt = await response.text();
     throw new Error(`Failed to create Confluence page (${response.status}): ${txt}`);
   }
+
   const data = await response.json();
   return { id: data.id, link: data._links?.webui || '' };
 }

@@ -206,13 +206,19 @@ export async function publishToConfluence(payload: any): Promise<any> {
     );
 
     // ── Step 3: Build a descriptive page title ─────────────────────────
+    // A timestamp is always appended so re-publishing a sprint never collides
+    // with an existing page title in the same Confluence space.
     const fmtDate = (iso?: string) => {
       if (!iso) return '';
       const d = new Date(iso);
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
     const dateStr = startDate && endDate ? ` (${fmtDate(startDate)} – ${fmtDate(endDate)})` : '';
-    const pageTitle = `${sprintName || 'Sprint Report'} — ${projectName}${dateStr}`;
+    const publishedAt = new Date().toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+    const pageTitle = `${sprintName || 'Sprint Report'} — ${projectName}${dateStr} · ${publishedAt}`;
 
     // ── Step 4: Create the Confluence page ─────────────────────────────
     const { id: pageId, link: pageLink } = await createPage(
