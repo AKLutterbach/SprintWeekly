@@ -223,6 +223,7 @@ export function buildEmailTemplate(
 
     const completedRow   = issueTable(issues.completed        || [], `✅ Completed (${completeTotal})`,                                        '#36b37e', 12);
     const inProgressRow  = issueTable(issues.inProgress       || [], `🔄 In Progress (${inProgressTotal})`,                                    '#0065ff',  6);
+    const toDoRow        = issueTable(issues.toDo             || [], `📋 To Do (${toDoTotal})`,                                               '#97a0af',  6);
     const carryoverRow   = issueTable(issues.carryoverBlockers || [], `⚠️ Carryover / Blockers (${(issues.carryoverBlockers || []).length})`,  '#ff8b00',  6);
 
     // Compact notice reminding recipients that the full PDF is attached
@@ -235,7 +236,7 @@ export function buildEmailTemplate(
         </td>
       </tr>`;
 
-    reportBodyRows = metricCards + statusStrip + completedRow + inProgressRow + carryoverRow + pdfNotice;
+    reportBodyRows = metricCards + statusStrip + completedRow + inProgressRow + toDoRow + carryoverRow + pdfNotice;
 
   } else {
     // Fallback when no report data is available — plain instructional text

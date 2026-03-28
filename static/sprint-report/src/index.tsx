@@ -289,6 +289,26 @@ const App: React.FC = () => {
     setEmailSuccess(null);
     try {
       const sprintObj = sprints.find(s => s.id === selectedSprint);
+      // Build the exact same byStatus structure that SprintReportPage.handleExportPDF
+      // sends to the PDF export resolver — keeps both PDFs identical.
+      // Key fix: overview.completed (past tense) maps to byStatus.complete — NOT overview.complete
+      const emailByStatus = reportData?.overview ? {
+        committed: {
+          total: reportData.overview.committed.total,
+          breakdown: reportData.overview.committed.breakdown,
+        },
+        complete: {
+          total: reportData.overview.completed.total,
+          breakdown: reportData.overview.completed.breakdown,
+        },
+        incomplete: {
+          total: reportData.overview.incomplete.total,
+          breakdown: reportData.overview.incomplete.breakdown,
+        },
+        ...(reportData.overview.inProgress ? { inProgress: reportData.overview.inProgress } : {}),
+        ...(reportData.overview.toDo       ? { toDo: reportData.overview.toDo }             : {}),
+      } : {};
+
       const result = await invoke('email.sendReport', {
         projectKey: selectedProject,
         sprintId: selectedSprint,
@@ -298,11 +318,7 @@ const App: React.FC = () => {
           generatedAt: new Date().toISOString(),
           scope: { type: 'project', id: selectedProject },
           metrics: (reportData as any).metrics || {},
-          byStatus: (reportData as any).overview ? {
-            complete: (reportData as any).overview.complete,
-            inProgress: (reportData as any).overview.inProgress,
-            toDo: (reportData as any).overview.toDo,
-          } : {},
+          byStatus: emailByStatus,
           issues: reportData.issues || {},
         } : undefined,
         startDate: sprintObj?.startDate,

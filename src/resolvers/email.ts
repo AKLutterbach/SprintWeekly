@@ -164,17 +164,18 @@ export async function sendReportEmail(payload: any): Promise<any> {
       return { success: false, error: 'Could not generate report data.' };
     }
 
-    // Generate the PDF
+    // Generate the PDF — use the project name as the report title so it matches
+    // the PDF produced by the Generate PDF button in the UI
+    const projectName = await getProjectName(projectKey);
     const pdfBuffer = await generatePDF(
       data,
       sprintName || 'Sprint Report',
-      'Smart Sprints Report',
+      projectName || 'Sprint Report',
       startDate,
       endDate
     );
 
-    // Build the email HTML
-    const projectName = await getProjectName(projectKey);
+    // Build the email HTML (projectName already fetched above for the PDF title)
 
     // Pass the full report data so the email body renders an inline visual
     // summary — stakeholders see metrics + issues without opening the PDF
