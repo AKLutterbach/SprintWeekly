@@ -63,18 +63,22 @@ export function buildEmailTemplate(
     const issues    = reportData.issues   || {};
     const byStatus  = reportData.byStatus || {};
 
-    // Numeric metric fields — default to 0 if missing
-    const completedSP    = Number(metrics.completedStoryPoints) || 0;
-    const totalSP        = Number(metrics.totalStoryPoints)     || 0;
-    const carryoverCount = Number(metrics.carryoverIssues)      || 0;
-    const blockedCount   = Number(metrics.blockedIssues ?? metrics.blockers) || 0;
-    const defects        = Number(metrics.defects)              || 0;
-    const completionRate = totalSP > 0 ? Math.round((completedSP / totalSP) * 100) : 0;
+    // Pull issue counts and breakdown sub-values from byStatus — exactly mirroring
+    // how the PDF "Sprint Overview" section reads this data in export.ts.
+    const completeTotal    = Number(byStatus?.complete?.total)    || 0;
+    const inProgressTotal  = Number(byStatus?.inProgress?.total)  || 0;
+    const toDoTotal        = Number(byStatus?.toDo?.total)        || 0;
 
-    // Issue counts — prefer byStatus totals, fall back to array length
-    const completeCount   = Number(byStatus?.complete?.total)    || (issues.completed?.length   ?? 0);
-    const inProgressCount = Number(byStatus?.inProgress?.total)  || (issues.inProgress?.length  ?? 0);
-    const toDoCount       = Number(byStatus?.toDo?.total)        || (issues.toDo?.length        ?? 0);
+    // Sub-chip values (from last sprint / planned at start / added mid-sprint)
+    const bd = (cat: any) => cat?.breakdown || {};
+    const completeBreak   = bd(byStatus?.complete);
+    const inProgressBreak = bd(byStatus?.inProgress);
+    const toDoBreak       = bd(byStatus?.toDo);
+
+    // Derived values used in status strip and issue tables
+    const defects        = Number(metrics.defects) || 0;
+    const carryoverCount = Number(metrics.carryoverIssues) || 0;
+    const blockedCount   = Number(metrics.blockedIssues ?? metrics.blockers) || 0;
 
     // Normalize issue fields — issues may arrive in two shapes:
     //   flat:   { key, summary, status, storyPoints }
@@ -87,50 +91,72 @@ export function buildEmailTemplate(
       return v != null ? `${v}sp` : '–';
     };
 
+    // ── Sub-chip helper ─────────────────────────────────────────────────────
+    // Three small pill badges shown beneath each large card, matching the PDF
+    // breakdown sub-cards (from last sprint / planned at start / added mid-sprint).
+    const subChips = (fromLast: number, planned: number, added: number, textColor: string) =>
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
+        <tr>
+          <td style="text-align:center; padding:0 1px;">
+            <div style="font-size:13px; font-weight:700; color:${textColor};">${fromLast}</div>
+            <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.2;">From last<br/>sprint</div>
+          </td>
+          <td style="text-align:center; padding:0 1px;">
+            <div style="font-size:13px; font-weight:700; color:${textColor};">${planned}</div>
+            <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.2;">Planned<br/>at start</div>
+          </td>
+          <td style="text-align:center; padding:0 1px;">
+            <div style="font-size:13px; font-weight:700; color:${textColor};">${added}</div>
+            <div style="font-size:9px; color:${textColor}; opacity:0.75; line-height:1.2;">Added<br/>mid-sprint</div>
+          </td>
+        </tr>
+      </table>`;
+
     // ── Metric card helper ──────────────────────────────────────────────────
-    // Renders one coloured card.  border-radius is ignored by classic Outlook
-    // but still shows with a flat coloured background there.
+    // Renders one coloured card with a large count, label, and 3 sub-chips.
     const card = (
-      val: string, label: string, sub: string,
-      bg: string, color: string, subColor: string,
+      count: number, label: string,
+      bg: string, color: string,
+      fromLast: number, planned: number, added: number,
     ) =>
       `<td valign="top" style="width:32%; padding:3px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="background:${bg}; padding:16px 10px 14px 10px; text-align:center; border-radius:6px;">
-              <div style="font-size:26px; font-weight:700; color:${color}; line-height:1;">${val}</div>
-              <div style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; letter-spacing:0.6px; margin-top:5px;">${label}</div>
-              <div style="font-size:11px; color:${subColor}; margin-top:3px;">${sub}</div>
+            <td style="background:${bg}; padding:16px 8px 14px 8px; text-align:center; border-radius:6px;">
+              <div style="font-size:28px; font-weight:700; color:${color}; line-height:1;">${count}</div>
+              <div style="font-size:10px; font-weight:700; color:${color}; text-transform:uppercase; letter-spacing:0.6px; margin-top:4px;">${label}</div>
+              ${subChips(fromLast, planned, added, color)}
             </td>
           </tr>
         </table>
       </td>`;
 
-    // Three metric cards: Velocity | Completion % | Carryover
+    // Three cards matching the PDF Sprint Overview: Complete | In Progress | To Do
     const metricCards = `
       <tr>
         <td style="padding: 24px 28px 0 28px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
               ${card(
-                `${completedSP}<span style="font-size:14px;font-weight:400;"> sp</span>`,
-                'Velocity',
-                `of ${totalSP} committed`,
-                '#e3fcef', '#006644', '#57d9a3',
+                completeTotal,   'Complete',
+                '#e3fcef', '#006644',
+                Number(completeBreak.fromLastSprint) || 0,
+                Number(completeBreak.plannedAtStart) || 0,
+                Number(completeBreak.addedMidSprint) || 0,
               )}
               ${card(
-                `${completionRate}%`,
-                'Completion',
-                `${completeCount} issues done`,
-                '#deebff', '#0747a6', '#4c9aff',
+                inProgressTotal, 'In Progress',
+                '#deebff', '#0747a6',
+                Number(inProgressBreak.fromLastSprint) || 0,
+                Number(inProgressBreak.plannedAtStart) || 0,
+                Number(inProgressBreak.addedMidSprint) || 0,
               )}
               ${card(
-                String(carryoverCount),
-                'Carryover',
-                `${blockedCount} blocked`,
-                carryoverCount > 0 ? '#fff4e5' : '#f4f5f7',
-                carryoverCount > 0 ? '#974f0c' : '#505f79',
-                carryoverCount > 0 ? '#ff991f' : '#97a0af',
+                toDoTotal,       'To Do',
+                '#f4f5f7', '#505f79',
+                Number(toDoBreak.fromLastSprint) || 0,
+                Number(toDoBreak.plannedAtStart) || 0,
+                Number(toDoBreak.addedMidSprint) || 0,
               )}
             </tr>
           </table>
@@ -143,17 +169,20 @@ export function buildEmailTemplate(
     const defectChip = defects > 0
       ? ` &nbsp;&middot;&nbsp; ${dot('#de350b')}<strong style="color:#de350b;">${defects}</strong>&nbsp;Defects`
       : '';
+    const carryoverChip = carryoverCount > 0
+      ? ` &nbsp;&middot;&nbsp; ${dot('#ff991f')}<strong style="color:#974f0c;">${carryoverCount}</strong>&nbsp;Carryover${blockedCount > 0 ? ` (${blockedCount} blocked)` : ''}`
+      : '';
 
     const statusStrip = `
       <tr>
         <td style="padding: 12px 28px 0 28px;">
           <div style="border-top:1px solid #ebecf0; padding-top:12px; font-size:12px; color:#42526e;">
-            ${dot('#36b37e')}<strong style="color:#006644;">${completeCount}</strong>&nbsp;Complete
+            ${dot('#36b37e')}<strong style="color:#006644;">${completeTotal}</strong>&nbsp;Complete
             &nbsp;&middot;&nbsp;
-            ${dot('#0065ff')}<strong style="color:#0052cc;">${inProgressCount}</strong>&nbsp;In Progress
+            ${dot('#0065ff')}<strong style="color:#0052cc;">${inProgressTotal}</strong>&nbsp;In Progress
             &nbsp;&middot;&nbsp;
-            ${dot('#97a0af')}<strong style="color:#505f79;">${toDoCount}</strong>&nbsp;To Do
-            ${defectChip}
+            ${dot('#97a0af')}<strong style="color:#505f79;">${toDoTotal}</strong>&nbsp;To Do
+            ${carryoverChip}${defectChip}
           </div>
         </td>
       </tr>`;
@@ -192,9 +221,9 @@ export function buildEmailTemplate(
         </tr>`;
     };
 
-    const completedRow   = issueTable(issues.completed        || [], `✅ Completed (${completeCount})`,                                          '#36b37e', 12);
-    const inProgressRow  = issueTable(issues.inProgress       || [], `🔄 In Progress (${inProgressCount})`,                                      '#0065ff',  6);
-    const carryoverRow   = issueTable(issues.carryoverBlockers || [], `⚠️ Carryover / Blockers (${(issues.carryoverBlockers || []).length})`,    '#ff8b00',  6);
+    const completedRow   = issueTable(issues.completed        || [], `✅ Completed (${completeTotal})`,                                        '#36b37e', 12);
+    const inProgressRow  = issueTable(issues.inProgress       || [], `🔄 In Progress (${inProgressTotal})`,                                    '#0065ff',  6);
+    const carryoverRow   = issueTable(issues.carryoverBlockers || [], `⚠️ Carryover / Blockers (${(issues.carryoverBlockers || []).length})`,  '#ff8b00',  6);
 
     // Compact notice reminding recipients that the full PDF is attached
     const pdfNotice = `
