@@ -41,6 +41,8 @@ const App: React.FC = () => {
   const [feedbackMenuOpen, setFeedbackMenuOpen] = useState(false);
   // Briefly true after user copies the email address
   const [feedbackCopied, setFeedbackCopied] = useState(false);
+  // True while a PDF export is in flight
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // ─── Email Delivery State ────────────────────────────────────────────
   const [emailRecipients, setEmailRecipients] = useState<string[]>([]);
@@ -360,6 +362,85 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * Export the current report as a PDF.
+   * Lifted from SprintReportPage so the trigger button can live in the persistent app bar.
+   */
+  const handleExportPDF = async () => {
+    if (!reportData) return;
+    try {
+      setPdfLoading(true);
+      const { overview, issues } = reportData;
+      // Build the byStatus structure expected by the export resolver
+      const byStatus = {
+        committed: {
+          total: overview.committed.total,
+          breakdown: overview.committed.breakdown
+        },
+        complete: {
+          total: overview.completed.total,
+          breakdown: overview.completed.breakdown
+        },
+        incomplete: {
+          total: overview.incomplete.total,
+          breakdown: overview.incomplete.breakdown
+        },
+        // Pass granular In Progress / To Do sub-counts so the export
+        // renderer doesn't fall back to proportional splitting.
+        ...(overview.inProgress ? { inProgress: overview.inProgress } : {}),
+        ...(overview.toDo ? { toDo: overview.toDo } : {})
+      };
+      const exportRequest = {
+        format: 'pdf',
+        reportData: {
+          requestId: `export-${Date.now()}`,
+          generatedAt: new Date().toISOString(),
+          scope: { type: 'sprint', id: reportData.sprintId?.toString() || '' },
+          byStatus,
+          metrics: {},
+          issues: issues || { completed: [], uncompleted: [], carryoverBlockers: [] }
+        },
+        sprintName: reportData.sprintName || '',
+        reportTitle: reportData.projectName ? `${reportData.projectName}` : 'Sprint Report',
+        startDate: reportData.startDate,
+        endDate: reportData.endDate,
+        // Send pre-formatted timestamp in the user's local timezone so the PDF footer is correct
+        generatedAt: new Date().toLocaleString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
+      };
+      const response: any = await invoke('export.report', exportRequest);
+      if (response.error) throw new Error(response.error);
+      const pdfData = response.base64 || response.pdf || response.data;
+      if (!pdfData) throw new Error('No PDF data received');
+      const byteCharacters = atob(pdfData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${reportData.projectName || 'Sprint'}-Report-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting PDF:', err);
+      alert('Unable to export PDF. Please try again or contact your Jira admin if the problem persists.');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   // Load projects on mount, pre-selecting the most recently edited project.
   useEffect(() => {
     const fetchProjects = async () => {
@@ -674,21 +755,6 @@ const App: React.FC = () => {
             </div>
             {/* Right: delivery settings + feedback actions */}
             <div className="sw-app-bar-actions">
-              {/* Delivery Settings button – only visible after report generation */}
-              {hasGeneratedReport && (
-                <button
-                  className="sw-delivery-settings-btn"
-                  type="button"
-                  onClick={() => setIsDeliveryModalOpen(true)}
-                >
-                  {/* Gear icon */}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Delivery Settings
-                </button>
-              )}
               {/* Transparent fullscreen backdrop closes the menu when clicking outside */}
               {feedbackMenuOpen && (
                 <div
@@ -754,6 +820,35 @@ const App: React.FC = () => {
                   </div>
                 )}
               </div>
+              {/* Delivery Settings – outlined secondary button, only after report generation */}
+              {hasGeneratedReport && (
+                <button
+                  className="sw-delivery-settings-btn"
+                  type="button"
+                  onClick={() => setIsDeliveryModalOpen(true)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Delivery Settings
+                </button>
+              )}
+              {/* Export PDF – primary filled button, only after report generation */}
+              {hasGeneratedReport && (
+                <button
+                  className="sw-export-pdf-btn"
+                  type="button"
+                  onClick={handleExportPDF}
+                  disabled={pdfLoading}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M14 11v3H2v-3H0v3c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-3h-2z"/>
+                    <path d="M7 11.5L3.5 8 5 6.5 7 8.5V0h2v8.5l2-2L12.5 8 9 11.5z"/>
+                  </svg>
+                  {pdfLoading ? 'Exporting...' : 'Export PDF'}
+                </button>
+              )}
             </div>
           </div>
 

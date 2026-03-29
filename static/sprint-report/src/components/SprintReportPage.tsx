@@ -1,5 +1,4 @@
 import React from 'react';
-import { invoke } from '@forge/bridge';
 import { ViewIssueModal } from '@forge/jira-bridge';
 import type { SprintReportData } from '../types';
 import './SprintReportPage.css';
@@ -17,8 +16,6 @@ interface SprintReportPageProps {
  */
 const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) => {
   const { overview, issues } = data;
-  const [loading, setLoading] = React.useState(false);
-
   // Use pre-categorised issue lists from the backend.  The backend is the single
   // source of truth for ALL metric values — this component is a pure renderer.
   const completeIssues = issues?.completed || [];
@@ -68,101 +65,6 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
     }
   };
 
-  // Function to export report as PDF
-  const handleExportPDF = async () => {
-    try {
-      setLoading(true);
-      
-      // Build the byStatus structure expected by the export resolver
-      // This structure directly maps the overview data to what the PDF renderer expects
-      const byStatus = {
-        committed: {
-          total: overview.committed.total,
-          breakdown: overview.committed.breakdown
-        },
-        complete: {
-          total: overview.completed.total,
-          breakdown: overview.completed.breakdown
-        },
-        incomplete: {
-          total: overview.incomplete.total,
-          breakdown: overview.incomplete.breakdown
-        },
-        // Pass granular In Progress / To Do sub-counts so the export
-        // renderer doesn't fall back to proportional splitting.
-        ...(overview.inProgress ? { inProgress: overview.inProgress } : {}),
-        ...(overview.toDo ? { toDo: overview.toDo } : {})
-      };
-      
-      // Call the export.report resolver with proper structure
-      const exportRequest = {
-        format: 'pdf',
-        reportData: {
-          requestId: `export-${Date.now()}`,
-          generatedAt: new Date().toISOString(),
-          scope: { type: 'sprint', id: data.sprintId?.toString() || '' },
-          byStatus: byStatus,
-          metrics: {}, // Keep empty for backwards compatibility
-          issues: issues || {
-            completed: [],
-            uncompleted: [],
-            carryoverBlockers: []
-          }
-        },
-        sprintName: data.sprintName || '',
-        reportTitle: data.projectName ? `${data.projectName}` : 'Sprint Report',
-        startDate: data.startDate,
-        endDate: data.endDate,
-        // Send pre-formatted timestamp in the user's local timezone so the PDF footer is correct
-        generatedAt: new Date().toLocaleString('en-US', {
-          month: '2-digit',
-          day: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })
-      };
-      
-      const response: any = await invoke('export.report', exportRequest);
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      // Check if we have the PDF data
-      const pdfData = response.base64 || response.pdf || response.data;
-      
-      if (!pdfData) {
-        throw new Error('No PDF data received');
-      }
-      
-      // Convert base64 to blob and download
-      const byteCharacters = atob(pdfData);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${data.projectName || 'Sprint'}-Report-${Date.now()}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error exporting PDF:', err);
-      alert('Unable to export PDF. Please try again or contact your Jira admin if the problem persists.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="sprint-report-page">
       <div className="report-header">
@@ -191,13 +93,6 @@ const SprintReportPage: React.FC<SprintReportPageProps> = ({ data, onRefresh }) 
               ].filter(Boolean).join(' · ')}
             </p>
           </div>
-          <button className="export-pdf-button" onClick={handleExportPDF} disabled={loading}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-              <path d="M14 11v3H2v-3H0v3c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-3h-2z"/>
-              <path d="M7 11.5L3.5 8 5 6.5 7 8.5V0h2v8.5l2-2L12.5 8 9 11.5z"/>
-            </svg>
-            {loading ? 'Exporting...' : 'Export PDF'}
-          </button>
         </div>
       </div>
 

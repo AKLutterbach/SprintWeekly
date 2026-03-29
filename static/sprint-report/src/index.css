@@ -63,7 +63,7 @@ body {
   background: linear-gradient(180deg, #ffffff 0%, #f8f9fb 100%);
   border: 1px solid rgba(9, 30, 66, 0.10);
   border-radius: 8px;
-  padding: 14px 20px;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -78,28 +78,25 @@ body {
   min-width: 0;
 }
 
-/* Right side: action buttons
-   margin-right nudges the button left to visually align
-   its center over the Generate Report button below */
+/* Right side: action buttons */
 .sw-app-bar-actions {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
-  margin-right: 24px;
 }
 
-/* Feedback button – matches Delivery Settings / Export PDF style */
+/* Send Feedback – ghost button, lowest visual weight */
 .sw-feedback-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 500;
+  gap: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 400;
   font-family: inherit;
-  color: #ffffff;
-  background: #0F2744;
+  color: #44546f;
+  background: transparent;
   border: none;
   border-radius: 6px;
   text-decoration: none;
@@ -108,25 +105,27 @@ body {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  transition: background 150ms ease;
+  transition: background 150ms ease, color 150ms ease;
 }
 
 .sw-feedback-btn:hover {
-  background: #1a3a5c;
+  background: rgba(9, 30, 66, 0.06);
+  color: #172b4d;
 }
 
 .sw-feedback-btn:active {
-  background: #0a1d33;
+  background: rgba(9, 30, 66, 0.12);
 }
 
 /* Copied confirmation state */
 .sw-feedback-btn--copied {
-  color: #ffffff;
-  background: #006644;
+  color: #006644;
+  background: transparent;
 }
 
 .sw-feedback-btn--copied:hover {
-  background: #00875a;
+  background: rgba(9, 30, 66, 0.06);
+  color: #006644;
 }
 
 /* Feedback dropdown menu */
@@ -280,8 +279,38 @@ body {
    Delivery Settings Modal
    ======================================== */
 
-/* Delivery Settings button in the app bar */
+/* Delivery Settings – outlined secondary button */
 .sw-delivery-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px; /* 1px inset to keep same height as filled buttons despite border */
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #0F2744;
+  background: transparent;
+  border: 1.5px solid #0F2744;
+  border-radius: 6px;
+  text-decoration: none;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.sw-delivery-settings-btn:hover {
+  background: rgba(15, 39, 68, 0.07);
+}
+
+.sw-delivery-settings-btn:active {
+  background: rgba(15, 39, 68, 0.14);
+}
+
+/* Export PDF – primary filled button, highest visual weight */
+.sw-export-pdf-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -302,12 +331,18 @@ body {
   transition: background 150ms ease;
 }
 
-.sw-delivery-settings-btn:hover {
+.sw-export-pdf-btn:hover {
   background: #1a3a5c;
 }
 
-.sw-delivery-settings-btn:active {
+.sw-export-pdf-btn:active {
   background: #0a1d33;
+}
+
+.sw-export-pdf-btn:disabled {
+  background: #6b778c;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 /* Modal Backdrop - darkened fullscreen overlay */
