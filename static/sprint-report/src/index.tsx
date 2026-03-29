@@ -33,9 +33,9 @@ const App: React.FC = () => {
   const [manualStartDate, setManualStartDate] = useState('');
   const [manualEndDate, setManualEndDate] = useState('');
 
-  // Panel state - new rail + drawer pattern
+  // Panel state - centered modal for delivery settings
   const [hasGeneratedReport, setHasGeneratedReport] = useState(false);
-  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
 
   // Feedback dropdown state
   const [feedbackMenuOpen, setFeedbackMenuOpen] = useState(false);
@@ -515,7 +515,7 @@ const App: React.FC = () => {
         
         setReportData(transformedData);
         setHasGeneratedReport(true); // Mark that report has been generated
-        setIsCustomizerOpen(false); // Collapse to rail after generation
+        setIsDeliveryModalOpen(false); // Close modal after generation
       } else {
         setError('No data available for the selected sprint. The sprint may be empty or have no accessible issues.');
       }
@@ -533,7 +533,7 @@ const App: React.FC = () => {
   const renderCustomizationControls = (isDarkMode = false) => {
     const labelColor = isDarkMode ? '#ffffff' : '#6b778c';
     const textColor = isDarkMode ? '#ffffff' : '#172b4d';
-    const helperColor = isDarkMode ? '#b3d4ff' : '#6b778c';
+    const helperColor = isDarkMode ? '#d4e5ff' : '#6b778c';
     const buttonBg = canGenerate ? (isDarkMode ? '#ffffff' : '#0F2744') : '#5e6c84';
     const buttonText = canGenerate ? (isDarkMode ? '#0F2744' : '#ffffff') : '#172b4d';
     
@@ -672,8 +672,23 @@ const App: React.FC = () => {
                 </p>
               </div>
             </div>
-            {/* Right: feedback action – dropdown with mailto primary + copy-address fallback */}
+            {/* Right: delivery settings + feedback actions */}
             <div className="sw-app-bar-actions">
+              {/* Delivery Settings button – only visible after report generation */}
+              {hasGeneratedReport && (
+                <button
+                  className="sw-delivery-settings-btn"
+                  type="button"
+                  onClick={() => setIsDeliveryModalOpen(true)}
+                >
+                  {/* Gear icon */}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Delivery Settings
+                </button>
+              )}
               {/* Transparent fullscreen backdrop closes the menu when clicking outside */}
               {feedbackMenuOpen && (
                 <div
@@ -819,70 +834,62 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Rail + Drawer Pattern - Only after report generation */}
-      {hasGeneratedReport && (
+      {/* Delivery Settings Modal - Only after report generation */}
+      {hasGeneratedReport && isDeliveryModalOpen && (
         <>
-          {/* Vertical Rail with Toggle Button */}
-          <div className="sw-customization-rail">
-            <button
-              className="sw-rail-toggle-btn"
-              onClick={() => setIsCustomizerOpen(true)}
-              aria-label="Open customization panel"
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="sw-rail-text">Email Automation</span>
-              </div>
-            </button>
-          </div>
+          {/* Modal Backdrop */}
+          <div
+            className="sw-modal-backdrop"
+            onClick={() => setIsDeliveryModalOpen(false)}
+          />
 
-          {/* Overlay Drawer */}
-          <div className={`sw-customization-drawer ${isCustomizerOpen ? 'open' : 'closed'}`}>
-            <div className="sw-drawer-content">
-              {/* Close Button - X in top left */}
+          {/* Centered Modal */}
+          <div className="sw-delivery-modal">
+            {/* Modal Header */}
+            <div className="sw-modal-header">
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 600, color: '#ffffff' }}>
+                  Delivery Settings
+                </h3>
+                <p style={{ margin: '0', fontSize: '14px', color: '#d4e5ff' }}>
+                  Configure email delivery and Confluence publishing on a per-project basis.
+                </p>
+              </div>
               <button
-                className="sw-drawer-close-btn"
-                onClick={() => setIsCustomizerOpen(false)}
-                aria-label="Close customization panel"
+                className="sw-modal-close-btn"
+                onClick={() => setIsDeliveryModalOpen(false)}
+                aria-label="Close delivery settings"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              
-              {/* Drawer Header */}
-              <div style={{ marginBottom: '20px' }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 600, color: '#ffffff' }}>
-                  Email Automation
-                </h3>
-                <p style={{ margin: '0', fontSize: '13px', color: '#b3d4ff' }}>
-                  Configure your report and email delivery settings.
-                </p>
-              </div>
+            </div>
+
+            {/* Modal Body – scrollable content area */}
+            <div className="sw-modal-body">
 
               {/* ─── Section 1: Email Delivery ─── */}
-              <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: '8px', padding: '20px', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <div style={{ width: '3px', height: '16px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>Email Delivery</span>
+                  <div style={{ width: '3px', height: '18px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff' }}>Email Delivery</span>
                 </div>
 
                 {!selectedProject ? (
-                  <p style={{ fontSize: '13px', color: '#b3d4ff', fontStyle: 'italic' }}>
+                  <p style={{ fontSize: '14px', color: '#d4e5ff', fontStyle: 'italic' }}>
                     Select a project above to configure email delivery.
                   </p>
                 ) : emailConfigLoading ? (
-                  <p style={{ fontSize: '13px', color: '#b3d4ff' }}>Loading email settings...</p>
+                  <p style={{ fontSize: '14px', color: '#d4e5ff' }}>Loading email settings...</p>
                 ) : (
                   <>
                     {/* Company name */}
                     <div style={{ marginBottom: '20px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '14px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
                         Company Name
                       </label>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '11px', color: '#b3d4ff' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#d4e5ff' }}>
                         Shown in the email header. Leave blank to use the project name.
                       </p>
                       <input
@@ -891,15 +898,15 @@ const App: React.FC = () => {
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
                         onBlur={() => saveEmailConfig(emailRecipients, autoSendOnClose, companyName)}
-                        style={{ width: '100%', padding: '7px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.3)', fontSize: '14px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff', boxSizing: 'border-box' }}
                       />
                     </div>
 
                     {/* Auto-send toggle */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '10px 12px' }}>
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: 400, color: '#ffffff' }}>Auto-send on sprint close</div>
-                        <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#b3d4ff' }}>
+                        <div style={{ fontSize: '15px', fontWeight: 400, color: '#ffffff' }}>Auto-send on sprint close</div>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: '#d4e5ff' }}>
                           Automatically email the report when a sprint is completed.
                         </p>
                       </div>
@@ -925,7 +932,7 @@ const App: React.FC = () => {
 
                     {/* Recipient list */}
                     <div style={{ marginBottom: '16px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '14px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
                         Recipients ({emailRecipients.length}/8)
                       </label>
                       <div style={{ display: 'flex', gap: '6px' }}>
@@ -935,17 +942,17 @@ const App: React.FC = () => {
                           value={newEmailInput}
                           onChange={(e) => { setNewEmailInput(e.target.value); setEmailError(null); }}
                           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(); } }}
-                          style={{ flex: 1, padding: '7px 10px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff' }}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.3)', fontSize: '14px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff' }}
                           disabled={emailRecipients.length >= 8}
                         />
                         <button
                           onClick={addRecipient}
                           disabled={emailRecipients.length >= 8 || !newEmailInput.trim()}
                           style={{
-                            padding: '7px 14px', borderRadius: '4px', border: 'none',
+                            padding: '8px 14px', borderRadius: '4px', border: 'none',
                             backgroundColor: emailRecipients.length >= 8 || !newEmailInput.trim() ? '#5e6c84' : '#ffffff',
                             color: emailRecipients.length >= 8 || !newEmailInput.trim() ? '#172b4d' : '#0F2744',
-                            fontSize: '13px', fontWeight: 600, cursor: emailRecipients.length >= 8 || !newEmailInput.trim() ? 'not-allowed' : 'pointer',
+                            fontSize: '14px', fontWeight: 600, cursor: emailRecipients.length >= 8 || !newEmailInput.trim() ? 'not-allowed' : 'pointer',
                           }}
                         >
                           Add
@@ -959,13 +966,13 @@ const App: React.FC = () => {
                         {emailRecipients.map(email => (
                           <span key={email} style={{
                             display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            padding: '4px 10px', borderRadius: '12px',
-                            backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', fontSize: '12px',
+                            padding: '5px 12px', borderRadius: '12px',
+                            backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', fontSize: '13px',
                           }}>
                             {email}
                             <button
                               onClick={() => removeRecipient(email)}
-                              style={{ background: 'none', border: 'none', color: '#b3d4ff', cursor: 'pointer', padding: '0 0 0 2px', fontSize: '14px', lineHeight: 1 }}
+                              style={{ background: 'none', border: 'none', color: '#d4e5ff', cursor: 'pointer', padding: '0 0 0 2px', fontSize: '14px', lineHeight: 1 }}
                               aria-label={`Remove ${email}`}
                             >
                               &times;
@@ -993,7 +1000,7 @@ const App: React.FC = () => {
                         onClick={handleSendTest}
                         disabled={emailSending || emailRecipients.length === 0}
                         style={{
-                          padding: '8px 14px', borderRadius: '4px', fontSize: '13px', fontWeight: 500,
+                          padding: '9px 16px', borderRadius: '4px', fontSize: '14px', fontWeight: 500,
                           border: '1px solid rgba(255,255,255,0.3)', backgroundColor: 'transparent',
                           color: emailSending || emailRecipients.length === 0 ? '#5e6c84' : '#ffffff',
                           cursor: emailSending || emailRecipients.length === 0 ? 'not-allowed' : 'pointer',
@@ -1006,7 +1013,7 @@ const App: React.FC = () => {
                           onClick={handleSendReport}
                           disabled={emailSending || emailRecipients.length === 0}
                           style={{
-                            padding: '8px 14px', borderRadius: '4px', fontSize: '13px', fontWeight: 600,
+                            padding: '9px 16px', borderRadius: '4px', fontSize: '14px', fontWeight: 600,
                             border: 'none',
                             backgroundColor: emailSending || emailRecipients.length === 0 ? '#5e6c84' : '#ffffff',
                             color: emailSending || emailRecipients.length === 0 ? '#172b4d' : '#0F2744',
@@ -1020,48 +1027,48 @@ const App: React.FC = () => {
 
                     {/* Last sent info */}
                     {lastSentInfo?.sentAt && (
-                      <div style={{ marginTop: '12px', fontSize: '11px', color: '#b3d4ff' }}>
+                      <div style={{ marginTop: '12px', fontSize: '12px', color: '#d4e5ff' }}>
                         Last sent: {new Date(lastSentInfo.sentAt).toLocaleString()} — {lastSentInfo.sprintName}
                       </div>
                     )}
 
                     {/* Saving indicator */}
                     {emailSaving && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#b3d4ff', fontStyle: 'italic' }}>Saving...</div>
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#d4e5ff', fontStyle: 'italic' }}>Saving...</div>
                     )}
                   </>
                 )}
               </div>
 
               {/* ─── Section 2: Confluence Publishing ─── */}
-              <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: '8px', padding: '20px', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <div style={{ width: '3px', height: '16px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>Confluence Publishing</span>
+                  <div style={{ width: '3px', height: '18px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff' }}>Confluence Publishing</span>
                 </div>
 
                 {!selectedProject ? (
-                  <p style={{ fontSize: '13px', color: '#b3d4ff', fontStyle: 'italic' }}>
+                  <p style={{ fontSize: '14px', color: '#d4e5ff', fontStyle: 'italic' }}>
                     Select a project above to configure Confluence publishing.
                   </p>
                 ) : confluenceConfigLoading ? (
-                  <p style={{ fontSize: '13px', color: '#b3d4ff' }}>Loading Confluence settings...</p>
+                  <p style={{ fontSize: '14px', color: '#d4e5ff' }}>Loading Confluence settings...</p>
                 ) : (
                   <>
                     {/* Space picker */}
                     <div style={{ marginBottom: '20px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '14px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
                         Confluence Space
                       </label>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '11px', color: '#b3d4ff' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#d4e5ff' }}>
                         Reports will be published as pages in this space.
                       </p>
                       <select
                         value={confluenceConfig.spaceId}
                         onChange={(e) => handleConfluenceSpaceChange(e.target.value)}
                         style={{
-                          width: '100%', padding: '7px 10px', borderRadius: '4px',
-                          border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px',
+                          width: '100%', padding: '8px 12px', borderRadius: '4px',
+                          border: '1px solid rgba(255,255,255,0.3)', fontSize: '14px',
                           backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff',
                           boxSizing: 'border-box',
                         }}
@@ -1078,18 +1085,18 @@ const App: React.FC = () => {
                     {/* Parent page picker (only shown when a space is selected) */}
                     {confluenceConfig.spaceId && (
                       <div style={{ marginBottom: '20px' }}>
-                        <label style={{ fontSize: '13px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
-                          Parent Page <span style={{ fontWeight: 400, color: '#b3d4ff' }}>(optional)</span>
+                        <label style={{ fontSize: '14px', fontWeight: 500, color: '#ffffff', marginBottom: '4px', display: 'block' }}>
+                          Parent Page <span style={{ fontWeight: 400, color: '#d4e5ff' }}>(optional)</span>
                         </label>
-                        <p style={{ margin: '0 0 6px 0', fontSize: '11px', color: '#b3d4ff' }}>
+                        <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#d4e5ff' }}>
                           Reports will be nested under this page. Leave blank for top-level.
                         </p>
                         <select
                           value={confluenceConfig.parentPageId}
                           onChange={(e) => handleConfluenceParentChange(e.target.value)}
                           style={{
-                            width: '100%', padding: '7px 10px', borderRadius: '4px',
-                            border: '1px solid rgba(255,255,255,0.3)', fontSize: '13px',
+                            width: '100%', padding: '8px 12px', borderRadius: '4px',
+                            border: '1px solid rgba(255,255,255,0.3)', fontSize: '14px',
                             backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff',
                             boxSizing: 'border-box',
                           }}
@@ -1107,8 +1114,8 @@ const App: React.FC = () => {
                     {/* Auto-publish toggle */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '10px 12px' }}>
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: 400, color: '#ffffff' }}>Auto-publish on sprint close</div>
-                        <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#b3d4ff' }}>
+                        <div style={{ fontSize: '15px', fontWeight: 400, color: '#ffffff' }}>Auto-publish on sprint close</div>
+                        <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: '#d4e5ff' }}>
                           Automatically publish the report to Confluence when a sprint closes.
                         </p>
                       </div>
@@ -1151,7 +1158,7 @@ const App: React.FC = () => {
                           onClick={handlePublishToConfluence}
                           disabled={confluencePublishing || !confluenceConfig.spaceId}
                           style={{
-                            padding: '8px 14px', borderRadius: '4px', fontSize: '13px', fontWeight: 600,
+                            padding: '9px 16px', borderRadius: '4px', fontSize: '14px', fontWeight: 600,
                             border: 'none',
                             backgroundColor: confluencePublishing || !confluenceConfig.spaceId ? '#5e6c84' : '#ffffff',
                             color: confluencePublishing || !confluenceConfig.spaceId ? '#172b4d' : '#0F2744',
@@ -1165,7 +1172,7 @@ const App: React.FC = () => {
 
                     {/* Last published info */}
                     {lastPublishedInfo?.publishedAt && (
-                      <div style={{ marginTop: '12px', fontSize: '11px', color: '#b3d4ff' }}>
+                      <div style={{ marginTop: '12px', fontSize: '12px', color: '#d4e5ff' }}>
                         Last published: {new Date(lastPublishedInfo.publishedAt).toLocaleString()} — {lastPublishedInfo.sprintName}
                         {lastPublishedInfo.pageUrl && (
                           <span>
@@ -1185,30 +1192,22 @@ const App: React.FC = () => {
 
                     {/* Saving indicator */}
                     {confluenceSaving && (
-                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#b3d4ff', fontStyle: 'italic' }}>Saving...</div>
+                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#d4e5ff', fontStyle: 'italic' }}>Saving...</div>
                     )}
                   </>
                 )}
               </div>
 
               {/* ─── Section 3: Report Settings ─── */}
-              <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <div style={{ width: '3px', height: '16px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff' }}>Report Settings</span>
+                  <div style={{ width: '3px', height: '18px', backgroundColor: '#579DFF', borderRadius: '2px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff' }}>Report Settings</span>
                 </div>
                 {renderCustomizationControls(true)}
               </div>
             </div>
           </div>
-
-          {/* Backdrop overlay when drawer is open */}
-          {isCustomizerOpen && (
-            <div 
-              className="sw-drawer-backdrop" 
-              onClick={() => setIsCustomizerOpen(false)}
-            />
-          )}
         </>
       )}
     </div>

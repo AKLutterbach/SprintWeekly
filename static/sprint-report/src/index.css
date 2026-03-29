@@ -89,51 +89,44 @@ body {
   margin-right: 24px;
 }
 
-/* Feedback button – secondary style, works as a <button> element */
+/* Feedback button – matches Delivery Settings / Export PDF style */
 .sw-feedback-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
   font-weight: 500;
   font-family: inherit;
-  color: #42526e;
-  background: transparent;
-  border: 1px solid #dfe1e6;
-  border-radius: 4px;
+  color: #ffffff;
+  background: #0F2744;
+  border: none;
+  border-radius: 6px;
   text-decoration: none;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  /* Reset default <button> appearance */
   -webkit-appearance: none;
   appearance: none;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background 150ms ease;
 }
 
 .sw-feedback-btn:hover {
-  background: #f4f5f7;
-  border-color: #b3bac5;
-  color: #172b4d;
+  background: #1a3a5c;
 }
 
 .sw-feedback-btn:active {
-  background: #ebecf0;
-  border-color: #8993a4;
+  background: #0a1d33;
 }
 
 /* Copied confirmation state */
 .sw-feedback-btn--copied {
-  color: #006644;
-  border-color: #abf5d1;
-  background: #e3fcef;
+  color: #ffffff;
+  background: #006644;
 }
 
 .sw-feedback-btn--copied:hover {
-  background: #abf5d1;
-  border-color: #57d9a3;
-  color: #006644;
+  background: #00875a;
 }
 
 /* Feedback dropdown menu */
@@ -283,141 +276,125 @@ body {
   /* inherits .sw-card styles */
 }
 
-/* Customization Rail - Narrow vertical panel docked to right edge */
-.sw-customization-rail {
-  position: fixed;
-  top: 24px;
-  right: 0;
-  width: 36px;
-  height: auto;
-  background: #1B3A4B;
-  border: 1px solid #1B3A4B;
-  border-right: none;
-  border-top-left-radius: 8px;
-  border-bottom-left-radius: 8px;
-  box-shadow: 0 2px 8px rgba(9, 30, 66, 0.15);
-  z-index: 90;
-  display: flex;
+/* ========================================
+   Delivery Settings Modal
+   ======================================== */
+
+/* Delivery Settings button in the app bar */
+.sw-delivery-settings-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
-  animation: slideInFromRight 600ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* Rail Toggle Button */
-.sw-rail-toggle-btn {
-  background: transparent;
-  border: none;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
   color: #ffffff;
-  cursor: pointer;
-  padding: 16px 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  border-radius: 8px;
-  transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.sw-rail-toggle-btn:hover {
-  color: #deebff;
-}
-
-.sw-rail-toggle-btn:active {
-  color: #b3d4ff;
-}
-
-/* Rail Text - Vertical writing mode */
-.sw-rail-text {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
+  background: #0F2744;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  line-height: 1;
   white-space: nowrap;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 150ms ease;
 }
 
-/* Customization Drawer - Overlay panel */
-.sw-customization-drawer {
+.sw-delivery-settings-btn:hover {
+  background: #1a3a5c;
+}
+
+.sw-delivery-settings-btn:active {
+  background: #0a1d33;
+}
+
+/* Modal Backdrop - darkened fullscreen overlay */
+.sw-modal-backdrop {
   position: fixed;
   top: 0;
-  right: 0;
-  width: 395px;
+  left: 0;
+  width: 100vw;
   height: 100vh;
+  background-color: rgba(9, 30, 66, 0.54);
+  z-index: 200;
+  animation: sw-fadeIn 200ms ease;
+}
+
+/* Modal Container - centered card */
+.sw-delivery-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 830px;
+  max-width: calc(100vw - 48px);
+  max-height: 85vh;
   background: #1B3A4B;
-  box-shadow: -4px 0 16px rgba(9, 30, 66, 0.2);
-  z-index: 100;
-  overflow-y: auto;
-  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(9, 30, 66, 0.35);
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  animation: sw-modalSlideIn 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.sw-customization-drawer.open {
-  transform: translateX(0);
-  opacity: 1;
+@keyframes sw-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-.sw-customization-drawer.closed {
-  transform: translateX(100%);
-  opacity: 0;
-  pointer-events: none;
+@keyframes sw-modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
 }
 
-/* Drawer Content Padding */
-.sw-drawer-content {
-  padding: 24px;
-  position: relative;
-  padding-top: 56px;
+/* Modal Header - sticky at top */
+.sw-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px 28px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
-/* Drawer Close Button - X in top left */
-.sw-drawer-close-btn {
-  position: absolute;
-  top: 16px;
-  left: 16px;
+/* Modal Close Button - X in header */
+.sw-modal-close-btn {
   background: transparent;
   border: none;
-  color: #42526e;
+  color: #b3d4ff;
   cursor: pointer;
   padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
-              color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-.sw-drawer-close-btn:hover {
-  background-color: #f4f5f7;
-  color: #172b4d;
+.sw-modal-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
-.sw-drawer-close-btn:active {
-  background-color: #ebecf0;
+.sw-modal-close-btn:active {
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
-/* Drawer Backdrop */
-.sw-drawer-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(97, 97, 97, 0.54);
-  z-index: 95;
-  transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+/* Modal Body - scrollable content area */
+.sw-modal-body {
+  padding: 20px 28px 28px;
+  overflow-y: auto;
+  flex: 1;
 }
 
