@@ -276,20 +276,22 @@ body {
   margin: 0 4px;
 }
 
-/* Send Feedback – icon-only ghost button, far right */
+/* Send Feedback button – persistent light grey fill, collapses to icon-only after report generation */
 .sw-feedback-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
+  gap: 6px;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-weight: 500;
   font-family: inherit;
   color: #44546f;
-  background: transparent;
+  background: rgba(9, 30, 66, 0.07);
   border: none;
   border-radius: 6px;
   line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
@@ -298,12 +300,19 @@ body {
 }
 
 .sw-feedback-btn:hover {
-  background: rgba(9, 30, 66, 0.06);
+  background: rgba(9, 30, 66, 0.13);
   color: #172b4d;
 }
 
 .sw-feedback-btn:active {
-  background: rgba(9, 30, 66, 0.12);
+  background: rgba(9, 30, 66, 0.18);
+}
+
+/* Icon-only variant: fixed square size, no extra padding */
+.sw-feedback-btn--icon-only {
+  width: 36px;
+  height: 36px;
+  padding: 0;
 }
 
 /* Copied confirmation state */
@@ -312,7 +321,7 @@ body {
 }
 
 .sw-feedback-btn--copied:hover {
-  background: rgba(9, 30, 66, 0.06);
+  background: rgba(9, 30, 66, 0.13);
   color: #006644;
 }
 .sw-export-pdf-btn {

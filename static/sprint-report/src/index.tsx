@@ -784,9 +784,9 @@ const App: React.FC = () => {
                   {pdfLoading ? 'Exporting...' : 'Export PDF'}
                 </button>
               )}
-              {/* Divider separating product actions from utility feedback */}
-              <div className="sw-app-bar-divider" aria-hidden="true" />
-              {/* Send feedback – icon-only ghost button, far right */}
+              {/* Divider only appears once product buttons are visible */}
+              {hasGeneratedReport && <div className="sw-app-bar-divider" aria-hidden="true" />}
+              {/* Send feedback – text+icon before report, icon-only after */}
               {/* Transparent fullscreen backdrop closes the menu when clicking outside */}
               {feedbackMenuOpen && (
                 <div
@@ -796,16 +796,20 @@ const App: React.FC = () => {
               )}
               <div style={{ position: 'relative', zIndex: 80 }}>
                 <button
-                  className={`sw-feedback-btn${feedbackCopied ? ' sw-feedback-btn--copied' : ''}`}
+                  className={`sw-feedback-btn${hasGeneratedReport ? ' sw-feedback-btn--icon-only' : ''}${feedbackCopied ? ' sw-feedback-btn--copied' : ''}`}
                   type="button"
                   title={feedbackCopied ? 'Email copied!' : 'Send feedback'}
                   aria-label="Send feedback"
                   onClick={() => setFeedbackMenuOpen(o => !o)}
                 >
                   {/* Speech bubble icon */}
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <path d="M14 1H2C1.4 1 1 1.4 1 2v9c0 .6.4 1 1 1h2v3l3.5-3H14c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
                   </svg>
+                  {/* Label only shown before report is generated */}
+                  {!hasGeneratedReport && (
+                    <span>{feedbackCopied ? 'Email copied!' : 'Send feedback'}</span>
+                  )}
                 </button>
                 {/* Dropdown menu */}
                 {feedbackMenuOpen && (
