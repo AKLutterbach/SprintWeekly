@@ -753,74 +753,9 @@ const App: React.FC = () => {
                 </p>
               </div>
             </div>
-            {/* Right: delivery settings + feedback actions */}
+            {/* Right: product actions, then send feedback icon far right */}
             <div className="sw-app-bar-actions">
-              {/* Transparent fullscreen backdrop closes the menu when clicking outside */}
-              {feedbackMenuOpen && (
-                <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 79 }}
-                  onClick={() => setFeedbackMenuOpen(false)}
-                />
-              )}
-              <div style={{ position: 'relative', zIndex: 80 }}>
-                {/* Main trigger button – toggles the dropdown */}
-                <button
-                  className={`sw-feedback-btn${feedbackCopied ? ' sw-feedback-btn--copied' : ''}`}
-                  type="button"
-                  onClick={() => setFeedbackMenuOpen(o => !o)}
-                >
-                  {/* Speech bubble icon */}
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M14 1H2C1.4 1 1 1.4 1 2v9c0 .6.4 1 1 1h2v3l3.5-3H14c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                  </svg>
-                  {feedbackCopied ? 'Email copied!' : 'Send feedback'}
-                </button>
-                {/* Dropdown menu */}
-                {feedbackMenuOpen && (
-                  <div className="sw-feedback-menu">
-                    {/* Option 1: open default email client via mailto: */}
-                    <button
-                      className="sw-feedback-menu-item"
-                      type="button"
-                      onClick={() => {
-                        setFeedbackMenuOpen(false);
-                        router.open('mailto:support@datainsightlab.co?subject=Smart%20Sprints%20Feedback');
-                      }}
-                    >
-                      {/* Envelope icon */}
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
-                        <path d="M1.5 4.5L8 9.5L14.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                      </svg>
-                      Open email client
-                    </button>
-                    {/* Option 2: copy email address to clipboard for manual use */}
-                    <button
-                      className="sw-feedback-menu-item"
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText('support@datainsightlab.co').then(() => {
-                          setFeedbackCopied(true);
-                          setFeedbackMenuOpen(false);
-                          // Reset the copied state after 2.5 seconds
-                          setTimeout(() => setFeedbackCopied(false), 2500);
-                        });
-                      }}
-                    >
-                      {/* Copy icon */}
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ flexShrink: 0 }}>
-                        <rect x="5" y="1" width="9" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
-                        <path d="M3 4.5H2C1.4 4.5 1 4.9 1 5.5v8.5c0 .6.4 1 1 1h7.5c.6 0 1-.4 1-1V13" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                      </svg>
-                      <div>
-                        <div>Copy email address</div>
-                        <div className="sw-feedback-menu-email">support@datainsightlab.co</div>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-              {/* Delivery Settings – outlined secondary button, only after report generation */}
+              {/* Delivery Settings – filled navy, only after report generation */}
               {hasGeneratedReport && (
                 <button
                   className="sw-delivery-settings-btn"
@@ -849,6 +784,69 @@ const App: React.FC = () => {
                   {pdfLoading ? 'Exporting...' : 'Export PDF'}
                 </button>
               )}
+              {/* Divider separating product actions from utility feedback */}
+              <div className="sw-app-bar-divider" aria-hidden="true" />
+              {/* Send feedback – icon-only ghost button, far right */}
+              {/* Transparent fullscreen backdrop closes the menu when clicking outside */}
+              {feedbackMenuOpen && (
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 79 }}
+                  onClick={() => setFeedbackMenuOpen(false)}
+                />
+              )}
+              <div style={{ position: 'relative', zIndex: 80 }}>
+                <button
+                  className={`sw-feedback-btn${feedbackCopied ? ' sw-feedback-btn--copied' : ''}`}
+                  type="button"
+                  title={feedbackCopied ? 'Email copied!' : 'Send feedback'}
+                  aria-label="Send feedback"
+                  onClick={() => setFeedbackMenuOpen(o => !o)}
+                >
+                  {/* Speech bubble icon */}
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M14 1H2C1.4 1 1 1.4 1 2v9c0 .6.4 1 1 1h2v3l3.5-3H14c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {/* Dropdown menu */}
+                {feedbackMenuOpen && (
+                  <div className="sw-feedback-menu">
+                    <button
+                      className="sw-feedback-menu-item"
+                      type="button"
+                      onClick={() => {
+                        setFeedbackMenuOpen(false);
+                        router.open('mailto:support@datainsightlab.co?subject=Smart%20Sprints%20Feedback');
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M1.5 4.5L8 9.5L14.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                      </svg>
+                      Open email client
+                    </button>
+                    <button
+                      className="sw-feedback-menu-item"
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('support@datainsightlab.co').then(() => {
+                          setFeedbackCopied(true);
+                          setFeedbackMenuOpen(false);
+                          setTimeout(() => setFeedbackCopied(false), 2500);
+                        });
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <rect x="5" y="1" width="9" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M3 4.5H2C1.4 4.5 1 4.9 1 5.5v8.5c0 .6.4 1 1 1h7.5c.6 0 1-.4 1-1V13" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                      </svg>
+                      <div>
+                        <div>Copy email address</div>
+                        <div className="sw-feedback-menu-email">support@datainsightlab.co</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

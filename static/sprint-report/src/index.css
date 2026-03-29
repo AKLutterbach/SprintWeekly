@@ -86,48 +86,6 @@ body {
   gap: 8px;
 }
 
-/* Send Feedback – ghost button, lowest visual weight */
-.sw-feedback-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 400;
-  font-family: inherit;
-  color: #44546f;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  text-decoration: none;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.sw-feedback-btn:hover {
-  background: rgba(9, 30, 66, 0.06);
-  color: #172b4d;
-}
-
-.sw-feedback-btn:active {
-  background: rgba(9, 30, 66, 0.12);
-}
-
-/* Copied confirmation state */
-.sw-feedback-btn--copied {
-  color: #006644;
-  background: transparent;
-}
-
-.sw-feedback-btn--copied:hover {
-  background: rgba(9, 30, 66, 0.06);
-  color: #006644;
-}
-
 /* Feedback dropdown menu */
 .sw-feedback-menu {
   position: absolute;
@@ -279,18 +237,18 @@ body {
    Delivery Settings Modal
    ======================================== */
 
-/* Delivery Settings – outlined secondary button */
+/* Delivery Settings – filled navy, same weight as Export PDF */
 .sw-delivery-settings-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 15px; /* 1px inset to keep same height as filled buttons despite border */
+  padding: 10px 16px;
   font-size: 14px;
   font-weight: 500;
   font-family: inherit;
-  color: #0F2744;
-  background: transparent;
-  border: 1.5px solid #0F2744;
+  color: #ffffff;
+  background: #0F2744;
+  border: none;
   border-radius: 6px;
   text-decoration: none;
   line-height: 1;
@@ -298,18 +256,65 @@ body {
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
-  transition: background 150ms ease, color 150ms ease;
+  transition: background 150ms ease;
 }
 
 .sw-delivery-settings-btn:hover {
-  background: rgba(15, 39, 68, 0.07);
+  background: #1a3a5c;
 }
 
 .sw-delivery-settings-btn:active {
-  background: rgba(15, 39, 68, 0.14);
+  background: #0a1d33;
 }
 
-/* Export PDF – primary filled button, highest visual weight */
+/* Thin vertical divider separating product actions from utility buttons */
+.sw-app-bar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(9, 30, 66, 0.15);
+  flex-shrink: 0;
+  margin: 0 4px;
+}
+
+/* Send Feedback – icon-only ghost button, far right */
+.sw-feedback-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-family: inherit;
+  color: #44546f;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 150ms ease, color 150ms ease;
+  flex-shrink: 0;
+}
+
+.sw-feedback-btn:hover {
+  background: rgba(9, 30, 66, 0.06);
+  color: #172b4d;
+}
+
+.sw-feedback-btn:active {
+  background: rgba(9, 30, 66, 0.12);
+}
+
+/* Copied confirmation state */
+.sw-feedback-btn--copied {
+  color: #006644;
+}
+
+.sw-feedback-btn--copied:hover {
+  background: rgba(9, 30, 66, 0.06);
+  color: #006644;
+}
 .sw-export-pdf-btn {
   display: inline-flex;
   align-items: center;
