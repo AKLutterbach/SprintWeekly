@@ -371,15 +371,15 @@ body {
   animation: sw-fadeIn 200ms ease;
 }
 
-/* Modal Container - centered card */
+/* Modal Container - top aligned with the report card container */
 .sw-delivery-modal {
   position: fixed;
-  top: 50%;
+  top: 128px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: 1004px;
   max-width: calc(100vw - 96px);
-  max-height: 85vh;
+  max-height: calc(100vh - 256px);
   background: #1B3A4B;
   border-radius: 12px;
   box-shadow: 0 12px 40px rgba(9, 30, 66, 0.35);
@@ -445,5 +445,11 @@ body {
   padding: 20px 28px 28px;
   overflow-y: auto;
   flex: 1;
+}
+
+/* Zero-height footer that lives outside the scroll area, preserving the bottom border-radius */
+.sw-modal-footer {
+  flex-shrink: 0;
+  height: 12px;
 }
 
