@@ -377,8 +377,8 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 830px;
-  max-width: calc(100vw - 48px);
+  width: 1004px;
+  max-width: calc(100vw - 96px);
   max-height: 85vh;
   background: #1B3A4B;
   border-radius: 12px;
